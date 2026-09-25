@@ -1,0 +1,3 @@
+CREATE DATABASE auth_db;
+CREATE DATABASE monitoring_db;
+CREATE DATABASE alert_db;
