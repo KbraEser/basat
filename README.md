@@ -25,7 +25,7 @@ Basat is a multi-tenant SaaS platform that turns meter data into actionable insi
 
 ## Architecture
 
-Planned services (event-driven, built around Kafka):
+Target architecture (event-driven, built around Kafka):
 
 ```
 Meter data → Ingestion Service → Kafka → Monitoring Service → TimescaleDB
@@ -59,7 +59,30 @@ React dashboard ← API Gateway ← Auth Service · Monitoring Service · AI Ser
 ### Prerequisites
 
 - Java 21
-- Docker (required for Testcontainers)
+- Docker with Docker Compose (local infrastructure and Testcontainers)
+
+### Start local infrastructure
+
+```bash
+docker compose up -d
+```
+
+This starts TimescaleDB (PostgreSQL 17) and Redis. The init script in `infra/postgres/init` creates one database per service (`auth_db`, `monitoring_db`, `alert_db`).
+
+| Service | Host port | Credentials |
+|---|---|---|
+| TimescaleDB | `5433` | `basat` / `basat` |
+| Redis | `6379` | none |
+
+TimescaleDB is mapped to `5433` so it does not clash with a PostgreSQL instance already running on `5432`.
+
+### Run the auth service
+
+```bash
+./mvnw -pl auth-service spring-boot:run
+```
+
+The service listens on port `8081` and applies the Flyway migrations to `auth_db` on startup. The connection can be overridden with the `DB_URL`, `DB_USERNAME` and `DB_PASSWORD` environment variables.
 
 ### Build and test
 
@@ -75,7 +98,7 @@ Tests run against a real TimescaleDB instance started automatically with Testcon
 
 - [x] Maven multi-module project setup
 - [x] CI with GitHub Actions
-- [ ] Local infrastructure with Docker Compose (TimescaleDB, Redis)
+- [x] Local infrastructure with Docker Compose (TimescaleDB, Redis)
 - [ ] Authentication and multi-tenancy
 - [ ] Site and meter management, data simulator
 - [ ] Kafka-based ingestion and time-series storage
@@ -92,6 +115,6 @@ In the *Book of Dede Korkut*, a classic Turkish epic, the hero **Basat** defeats
 
 ## Author
 
-**Kübra Eser**, Full Stack Developer with a background in Energy Systems Engineering and HVAC.
+**Kübra Eser**, Full Stack Developer with a background in Energy Systems Engineering.
 
 [GitHub](https://github.com/KbraEser)
