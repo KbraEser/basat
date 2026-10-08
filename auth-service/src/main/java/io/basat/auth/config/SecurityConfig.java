@@ -14,7 +14,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception{
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
         http
                 //TODO revisit when JWT is stored in HttpOnly cookies (SameSite + CSRF)
                 .csrf(AbstractHttpConfigurer::disable)
