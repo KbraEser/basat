@@ -1,5 +1,6 @@
 package io.basat.auth.authentication;
 
+import io.basat.auth.common.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -14,8 +15,8 @@ public class AuthController {
 
         @PostMapping("/register")
         @ResponseStatus(HttpStatus.CREATED)
-        public RegisterResponse registerResponse(@Valid @RequestBody RegisterRequest request){
-            return authService.register(request);
+        public ApiResponse<RegisterResponse> registerResponse(@Valid @RequestBody RegisterRequest request){
+            return ApiResponse.of(authService.register(request),"Company registered successfully");
         }
 
 }
