@@ -7,11 +7,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @TestConfiguration(proxyBeanMethods = false)
-class TestcontainersConfiguration {
+public class TestcontainersConfiguration {
 
 	@Bean
 	@ServiceConnection
-	PostgreSQLContainer postgresContainer() {
+	public PostgreSQLContainer postgresContainer() {
 		return new PostgreSQLContainer(DockerImageName.parse("timescale/timescaledb:2.30.1-pg17")
 				.asCompatibleSubstituteFor("postgres"));
 	}
