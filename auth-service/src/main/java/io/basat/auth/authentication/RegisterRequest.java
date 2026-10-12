@@ -25,6 +25,7 @@ public record RegisterRequest(
 
         @Schema(description = "Password, 8 to 72 characters (BCrypt uses at most 72 bytes)", example = "GucluSifre123")
         @NotBlank
+        // BCrypt only uses the first 72 bytes of a password
         @Size(min = 8, max = 72)
         String password
 ) {
