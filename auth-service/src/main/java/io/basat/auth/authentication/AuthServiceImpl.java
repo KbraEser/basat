@@ -25,6 +25,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public RegisterResponse register(RegisterRequest request){
+        // Locale.ROOT avoids the Turkish dotless-i problem: "I".toLowerCase() would give "ı"
         String email = request.email().trim().toLowerCase(Locale.ROOT);
 
         if(userRepository.existsByEmail(email)){
@@ -42,7 +43,8 @@ public class AuthServiceImpl implements AuthService {
                 Role.ADMIN
         ));
 
-        log.info("Registered tenant {} with admin user {} ", tenant.getId(), admin.getId());
+        // Log IDs only; emails are personal data (KVKK/GDPR)
+        log.info("Registered tenant {} with admin user {}", tenant.getId(), admin.getId());
 
         return new RegisterResponse(
                 tenant.getId(),

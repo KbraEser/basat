@@ -23,6 +23,7 @@
 
     <properties>
         <java.version>21</java.version>
+        <springdoc.version>3.1.1</springdoc.version>
         <!-- Empty default so @{argLine} below resolves even when no other plugin sets it -->
         <argLine></argLine>
     </properties>
@@ -31,6 +32,16 @@
     <modules>
         <module>auth-service</module>
     </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <plugins>
