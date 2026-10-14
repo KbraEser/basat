@@ -1,5 +1,7 @@
 package io.basat.auth.authentication;
 
+import io.basat.auth.authentication.dto.RegisterRequest;
+import io.basat.auth.authentication.dto.RegisterResponse;
 import io.basat.auth.config.SecurityConfig;
 import io.basat.auth.error.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;

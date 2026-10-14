@@ -1,7 +1,9 @@
 package io.basat.auth.authentication;
 
+import io.basat.auth.authentication.dto.*;
 import io.basat.auth.tenant.Tenant;
 import io.basat.auth.tenant.TenantRepository;
+import io.basat.auth.token.TokenService;
 import io.basat.auth.user.Role;
 import io.basat.auth.user.User;
 import io.basat.auth.user.UserRepository;
@@ -21,6 +23,7 @@ public class AuthServiceImpl implements AuthService {
     private final TenantRepository  tenantRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TokenService tokenService;
 
     @Override
     @Transactional
@@ -54,6 +57,24 @@ public class AuthServiceImpl implements AuthService {
         );
 
 
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public LoginResult login(LoginRequest request) {
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
+
+        User user = userRepository.findByEmail(email)
+                .filter(candidate -> passwordEncoder.matches(request.password(), candidate.getPasswordHash()))
+                .orElseThrow(() -> {
+                    log.warn("Login rejected: invalid credentials");
+                    return new InvalidCredentialsException();
+                });
+
+        log.info("User {} logged in", user.getId());
+
+        LoginResponse response = new LoginResponse(user.getId(), user.getTenant().getId(), user.getRole().name());
+        return new LoginResult(tokenService.createAccessToken(user), response);
     }
 
 

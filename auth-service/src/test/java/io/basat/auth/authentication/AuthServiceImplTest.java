@@ -1,5 +1,7 @@
 package io.basat.auth.authentication;
 
+import io.basat.auth.authentication.dto.RegisterRequest;
+import io.basat.auth.authentication.dto.RegisterResponse;
 import io.basat.auth.tenant.Tenant;
 import io.basat.auth.tenant.TenantRepository;
 import io.basat.auth.user.Role;
