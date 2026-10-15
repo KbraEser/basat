@@ -79,6 +79,18 @@ class AuthControllerTest {
     }
 
     @Test
+    void register_returns400_whenBodyIsMalformed() throws Exception {
+        // when + then
+        mockMvc.perform(post(REGISTER_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{not valid json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Request body is missing or malformed"));
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
     void register_returns409_whenEmailIsAlreadyUsed() throws Exception {
         // given
         when(authService.register(any(RegisterRequest.class)))
