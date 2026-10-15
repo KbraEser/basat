@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * database, repository or password hashing is involved.
  */
 @WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class})
+@Import({SecurityConfig.class, GlobalExceptionHandler.class, AuthCookieService.class})
 class AuthControllerTest {
 
     private static final String REGISTER_URL = "/api/auth/register";
