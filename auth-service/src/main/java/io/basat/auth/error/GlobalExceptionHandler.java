@@ -1,6 +1,7 @@
 package io.basat.auth.error;
 
 import io.basat.auth.authentication.EmailAlreadyUsedException;
+import io.basat.auth.authentication.InvalidCredentialsException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -54,4 +55,12 @@ public class GlobalExceptionHandler {
         problem.setTitle("Internal server error");
         return problem;
     }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ProblemDetail handleInvalidCredentials(InvalidCredentialsException ex){
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED,ex.getMessage());
+        problem.setTitle("Invalid credentials");
+        return problem;
+    }
+
 }

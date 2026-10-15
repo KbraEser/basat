@@ -1,4 +1,4 @@
-package io.basat.auth.authentication;
+package io.basat.auth.authentication.dto;
 
 import java.util.UUID;
 

@@ -1,5 +1,7 @@
 package io.basat.auth.authentication;
 
+import io.basat.auth.authentication.dto.RegisterRequest;
+import io.basat.auth.authentication.dto.RegisterResponse;
 import io.basat.auth.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
