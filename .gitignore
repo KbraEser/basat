@@ -50,5 +50,8 @@ logs/
 node_modules/
 
 
+### Local test files ###
+cookies.txt
+
 ### Kişisel notlar ###
 CLAUDE.md

@@ -1,7 +1,6 @@
 package io.basat.auth.authentication;
 
-import io.basat.auth.authentication.dto.RegisterRequest;
-import io.basat.auth.authentication.dto.RegisterResponse;
+import io.basat.auth.authentication.dto.*;
 import io.basat.auth.common.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -10,8 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Authentication", description = "Company registration and sign-in")
@@ -21,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
         private final AuthService authService;
+        private final AuthCookieService authCookieService;
 
         @Operation(
                 summary = "Register a company",
@@ -39,12 +38,31 @@ public class AuthController {
                         content = @Content(mediaType = "application/problem+json",
                                 schema = @Schema(implementation = ProblemDetail.class)))
         })
-
-
         @PostMapping("/register")
         @ResponseStatus(HttpStatus.CREATED)
         public ApiResponse<RegisterResponse> register(@Valid @RequestBody RegisterRequest request){
             return ApiResponse.of(authService.register(request),"Company registered successfully");
         }
+
+        @Operation(summary = "Log in",
+                description = "Checks the email and password. On success the access token is set as an "
+                        + "HttpOnly cookie and a summary of the user is returned in the body.")
+        @ApiResponses({
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "200", description = "Logged in; access_token cookie set"),
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "401", description = "Invalid email or password",
+                        content = @Content(mediaType = "application/problem+json",
+                                schema = @Schema(implementation = ProblemDetail.class)))
+        })
+        @PostMapping("/login")
+        public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request){
+                LoginResult result = authService.login(request);
+                ResponseCookie cookie = authCookieService.accessTokenCookie(result.accessToken());
+                return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE,cookie.toString())
+                        .body(ApiResponse.of(result.user(),"Login successful"));
+        }
+
+
 
 }

@@ -2,6 +2,7 @@ package io.basat.auth.authentication;
 
 import io.basat.auth.authentication.dto.RegisterRequest;
 import io.basat.auth.authentication.dto.RegisterResponse;
+import io.basat.auth.config.JwtConfig;
 import io.basat.auth.config.SecurityConfig;
 import io.basat.auth.error.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * database, repository or password hashing is involved.
  */
 @WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class})
+@Import({SecurityConfig.class, GlobalExceptionHandler.class, AuthCookieService.class, JwtConfig.class})
 class AuthControllerTest {
 
     private static final String REGISTER_URL = "/api/auth/register";
@@ -75,6 +76,18 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.errors.password").exists());
 
         // validation stops the request before it reaches the service
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    void register_returns400_whenBodyIsMalformed() throws Exception {
+        // when + then
+        mockMvc.perform(post(REGISTER_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{not valid json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Request body is missing or malformed"));
+
         verifyNoInteractions(authService);
     }
 
