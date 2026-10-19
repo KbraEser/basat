@@ -77,4 +77,11 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(NotFoundException.class)
+    public ProblemDetail handleNotFound(NotFoundException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setTitle("Not found");
+        return problem;
+    }
+
 }
