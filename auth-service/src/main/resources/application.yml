@@ -24,5 +24,6 @@ app:
   jwt:
     issuer: basat-auth
     access-token-ttl: 15m
+    refresh-token-ttl: 7d
   cookie:
     secure: false
