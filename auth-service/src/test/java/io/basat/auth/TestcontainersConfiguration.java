@@ -3,6 +3,7 @@ package io.basat.auth;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -14,6 +15,12 @@ public class TestcontainersConfiguration {
 	public PostgreSQLContainer postgresContainer() {
 		return new PostgreSQLContainer(DockerImageName.parse("timescale/timescaledb:2.30.1-pg17")
 				.asCompatibleSubstituteFor("postgres"));
+	}
+
+	@Bean
+	@ServiceConnection(name = "redis")
+	public GenericContainer<?> redisContainer() {
+		return new GenericContainer<>(DockerImageName.parse("redis:8.8-alpine")).withExposedPorts(6379);
 	}
 
 }
