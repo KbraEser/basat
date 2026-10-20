@@ -58,8 +58,10 @@ public class AuthController {
         @PostMapping("/login")
         public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request){
                 LoginResult result = authService.login(request);
-                ResponseCookie cookie = authCookieService.accessTokenCookie(result.accessToken());
-                return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE,cookie.toString())
+                ResponseCookie accessCookie = authCookieService.accessTokenCookie(result.accessToken());
+                ResponseCookie refreshCookie = authCookieService.refreshTokenCookie(result.refreshToken());
+                return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE,accessCookie.toString())
+                        .header(HttpHeaders.SET_COOKIE,refreshCookie.toString())
                         .body(ApiResponse.of(result.user(),"Login successful"));
         }
 

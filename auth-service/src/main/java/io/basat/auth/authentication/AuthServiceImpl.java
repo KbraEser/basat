@@ -3,6 +3,7 @@ package io.basat.auth.authentication;
 import io.basat.auth.authentication.dto.*;
 import io.basat.auth.tenant.Tenant;
 import io.basat.auth.tenant.TenantRepository;
+import io.basat.auth.token.RefreshTokenService;
 import io.basat.auth.token.TokenService;
 import io.basat.auth.user.Role;
 import io.basat.auth.user.User;
@@ -24,6 +25,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
+    private final RefreshTokenService refreshTokenService;
 
     @Override
     @Transactional
@@ -60,7 +62,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResult login(LoginRequest request) {
         String email = request.email().trim().toLowerCase(Locale.ROOT);
 
@@ -74,7 +76,7 @@ public class AuthServiceImpl implements AuthService {
         log.info("User {} logged in", user.getId());
 
         LoginResponse response = new LoginResponse(user.getId(), user.getTenant().getId(), user.getRole().name());
-        return new LoginResult(tokenService.createAccessToken(user), response);
+        return new LoginResult(tokenService.createAccessToken(user),refreshTokenService.create(user), response);
     }
 
 
