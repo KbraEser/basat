@@ -4,6 +4,7 @@ import io.basat.auth.authentication.dto.*;
 import io.basat.auth.tenant.Tenant;
 import io.basat.auth.tenant.TenantRepository;
 import io.basat.auth.token.RefreshTokenService;
+import io.basat.auth.token.RotationResult;
 import io.basat.auth.token.TokenService;
 import io.basat.auth.user.Role;
 import io.basat.auth.user.User;
@@ -77,6 +78,19 @@ public class AuthServiceImpl implements AuthService {
 
         LoginResponse response = new LoginResponse(user.getId(), user.getTenant().getId(), user.getRole().name());
         return new LoginResult(tokenService.createAccessToken(user),refreshTokenService.create(user), response);
+    }
+
+    @Override
+    @Transactional
+    public LoginResult refresh(String refreshToken) {
+        RotationResult rotation = refreshTokenService.rotate(refreshToken);
+        User user = rotation.user();
+
+        log.info("User {} refreshed tokens", user.getId());
+
+        LoginResponse response = new LoginResponse(user.getId(), user.getTenant().getId(), user.getRole().name());
+
+        return new LoginResult(tokenService.createAccessToken(user),rotation.refreshToken(),response);
     }
 
 

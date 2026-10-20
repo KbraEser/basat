@@ -21,4 +21,11 @@ public interface AuthService {
      * @throws InvalidCredentialsException if the email is unknown or the password is wrong
      */
     LoginResult login(LoginRequest request);
+
+    /**
+     * Exchanges a valid refresh token for a new access token and a new refresh token
+     * @throws InvalidRefreshTokenException if the token is unknown,revoked or expired
+     */
+    LoginResult refresh(String refreshToken);
+
 }
