@@ -4,6 +4,7 @@ import io.basat.auth.authentication.dto.LoginRequest;
 import io.basat.auth.authentication.dto.LoginResult;
 import io.basat.auth.authentication.dto.RegisterRequest;
 import io.basat.auth.authentication.dto.RegisterResponse;
+import io.basat.auth.token.InvalidRefreshTokenException;
 
 /** Registration and authentication use cases. */
 public interface AuthService {
@@ -28,4 +29,6 @@ public interface AuthService {
      */
     LoginResult refresh(String refreshToken);
 
+    /** Revokes the refresh token, if any. Logging out twice has the same result as once. */
+    void logout(String refreshToken);
 }

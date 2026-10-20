@@ -8,8 +8,14 @@ import java.time.Duration;
 
 @Component
 public class AuthCookieService {
+
     public static final String ACCESS_TOKEN_COOKIE = "access_token";
     public static final String REFRESH_TOKEN_COOKIE = "refresh_token";
+
+    private static final String ACCESS_TOKEN_PATH = "/";
+    // Only sent to /api/auth/** (refresh and logout), not to every request
+    private static final String REFRESH_TOKEN_PATH = "/api/auth";
+
     private final boolean secure;
     private final Duration accessTokenTtl;
     private final Duration refreshTokenTtl;
@@ -22,25 +28,30 @@ public class AuthCookieService {
         this.refreshTokenTtl = refreshTokenTtl;
     }
 
-    public ResponseCookie accessTokenCookie(String token){
-        return ResponseCookie.from(ACCESS_TOKEN_COOKIE,token)
-                .httpOnly(true)
-                .secure(secure)
-        // SameSite=Strict keeps the cookie off cross-site requests, which prevents CSRF
-                .sameSite("Strict")
-                .path("/")
-                .maxAge(accessTokenTtl)
-                .build();
+    public ResponseCookie accessTokenCookie(String token) {
+        return buildCookie(ACCESS_TOKEN_COOKIE, token, ACCESS_TOKEN_PATH, accessTokenTtl);
     }
 
-    public ResponseCookie refreshTokenCookie(String token){
-        return ResponseCookie.from(REFRESH_TOKEN_COOKIE,token)
+    public ResponseCookie refreshTokenCookie(String token) {
+        return buildCookie(REFRESH_TOKEN_COOKIE, token, REFRESH_TOKEN_PATH, refreshTokenTtl);
+    }
+
+    public ResponseCookie clearAccessTokenCookie() {
+        return buildCookie(ACCESS_TOKEN_COOKIE, "", ACCESS_TOKEN_PATH, Duration.ZERO);
+    }
+
+    public ResponseCookie clearRefreshTokenCookie() {
+        return buildCookie(REFRESH_TOKEN_COOKIE, "", REFRESH_TOKEN_PATH, Duration.ZERO);
+    }
+
+    private ResponseCookie buildCookie(String name, String value, String path, Duration maxAge) {
+        return ResponseCookie.from(name, value)
                 .httpOnly(true)
                 .secure(secure)
+                // SameSite=Strict keeps the cookie off cross-site requests, which prevents CSRF
                 .sameSite("Strict")
-        // Only sent to /api/auth/** (refresh and logout), not to every request
-                .path("/api/auth")
-                .maxAge(refreshTokenTtl)
+                .path(path)
+                .maxAge(maxAge)
                 .build();
     }
 }

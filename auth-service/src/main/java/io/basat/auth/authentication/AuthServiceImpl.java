@@ -93,5 +93,12 @@ public class AuthServiceImpl implements AuthService {
         return new LoginResult(tokenService.createAccessToken(user),rotation.refreshToken(),response);
     }
 
+    @Override
+    public void logout(String refreshToken) {
+        if (refreshToken != null) {
+            refreshTokenService.revoke(refreshToken);
+        }
+    }
+
 
 }

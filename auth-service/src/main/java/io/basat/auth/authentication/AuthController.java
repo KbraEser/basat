@@ -83,6 +83,17 @@ public class AuthController {
 
         }
 
+        @Operation(summary = "Log out",
+                description = "Revokes the refresh token and clears both authentication cookies.")
+        @PostMapping("/logout")
+        public ResponseEntity<Void> logout(  @CookieValue(name = AuthCookieService.REFRESH_TOKEN_COOKIE, required = false) String refreshToken){
+                authService.logout(refreshToken);
+                return ResponseEntity.noContent()
+                        .header(HttpHeaders.SET_COOKIE, authCookieService.clearAccessTokenCookie().toString())
+                        .header(HttpHeaders.SET_COOKIE, authCookieService.clearRefreshTokenCookie().toString())
+                        .build();
+        }
+
 
 
 }
