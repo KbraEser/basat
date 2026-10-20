@@ -2,6 +2,7 @@ package io.basat.auth.authentication;
 
 import io.basat.auth.authentication.dto.*;
 import io.basat.auth.common.ApiResponse;
+import io.basat.auth.token.InvalidRefreshTokenException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -58,9 +59,39 @@ public class AuthController {
         @PostMapping("/login")
         public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request){
                 LoginResult result = authService.login(request);
-                ResponseCookie cookie = authCookieService.accessTokenCookie(result.accessToken());
-                return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE,cookie.toString())
+                ResponseCookie accessCookie = authCookieService.accessTokenCookie(result.accessToken());
+                ResponseCookie refreshCookie = authCookieService.refreshTokenCookie(result.refreshToken());
+                return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE,accessCookie.toString())
+                        .header(HttpHeaders.SET_COOKIE,refreshCookie.toString())
                         .body(ApiResponse.of(result.user(),"Login successful"));
+        }
+
+        @Operation(summary = "Refresh tokens",
+                description = "Exchanges the refresh_token cookie for a new access token and a new refresh token. "
+                        + "The old refresh token is revoked.")
+        @PostMapping("/refresh")
+        public ResponseEntity<ApiResponse<LoginResponse>> refresh(@CookieValue(name = AuthCookieService.REFRESH_TOKEN_COOKIE,required = false)String refreshToken){
+                if(refreshToken == null){
+                        throw new InvalidRefreshTokenException();
+                }
+
+                LoginResult result = authService.refresh(refreshToken);
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.SET_COOKIE, authCookieService.accessTokenCookie(result.accessToken()).toString())
+                        .header(HttpHeaders.SET_COOKIE, authCookieService.refreshTokenCookie(result.refreshToken()).toString())
+                        .body(ApiResponse.of(result.user(), "Tokens refreshed"));
+
+        }
+
+        @Operation(summary = "Log out",
+                description = "Revokes the refresh token and clears both authentication cookies.")
+        @PostMapping("/logout")
+        public ResponseEntity<Void> logout(  @CookieValue(name = AuthCookieService.REFRESH_TOKEN_COOKIE, required = false) String refreshToken){
+                authService.logout(refreshToken);
+                return ResponseEntity.noContent()
+                        .header(HttpHeaders.SET_COOKIE, authCookieService.clearAccessTokenCookie().toString())
+                        .header(HttpHeaders.SET_COOKIE, authCookieService.clearRefreshTokenCookie().toString())
+                        .build();
         }
 
 
