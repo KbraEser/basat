@@ -2,6 +2,7 @@ package io.basat.auth.error;
 
 import io.basat.auth.authentication.EmailAlreadyUsedException;
 import io.basat.auth.authentication.InvalidCredentialsException;
+import io.basat.auth.authentication.TooManyLoginAttemptsException;
 import io.basat.auth.token.InvalidRefreshTokenException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -89,6 +90,13 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
         problem.setTitle("Invalid refresh token");
+        return problem;
+    }
+
+    @ExceptionHandler(TooManyLoginAttemptsException.class)
+    public ProblemDetail handleTooManyLoginAttempts(TooManyLoginAttemptsException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        problem.setTitle("Too many login attempts");
         return problem;
     }
 

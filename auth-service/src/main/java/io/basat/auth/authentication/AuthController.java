@@ -54,7 +54,12 @@ public class AuthController {
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(
                         responseCode = "401", description = "Invalid email or password",
                         content = @Content(mediaType = "application/problem+json",
+                                schema = @Schema(implementation = ProblemDetail.class))),
+                @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                        responseCode = "429",description = "Too many failed attempts; try again later",
+                        content = @Content(mediaType = "application/problem+json",
                                 schema = @Schema(implementation = ProblemDetail.class)))
+
         })
         @PostMapping("/login")
         public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request){
