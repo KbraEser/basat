@@ -1,5 +1,6 @@
 package io.basat.auth.token;
 
+import io.basat.auth.common.Hashing;
 import io.basat.auth.user.User;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -30,14 +31,14 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Transactional
     public String create(User user) {
         String rawToken = generateRawToken();
-        refreshTokenRepository.save(new RefreshToken(user,hash(rawToken), Instant.now().plus(refreshTokenTtl)));
+        refreshTokenRepository.save(new RefreshToken(user, Hashing.sha256Hex(rawToken), Instant.now().plus(refreshTokenTtl)));
         return rawToken;
     }
 
     @Override
     @Transactional
     public RotationResult rotate(String rawToken) {
-        RefreshToken current = refreshTokenRepository.findByTokenHash(hash(rawToken))
+        RefreshToken current = refreshTokenRepository.findByTokenHash(Hashing.sha256Hex(rawToken))
                 .filter(token -> token.isActive(Instant.now()))
                 .orElseThrow(InvalidRefreshTokenException::new);
 
@@ -49,7 +50,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Override
     @Transactional
     public void revoke(String rawToken) {
-        refreshTokenRepository.findByTokenHash(hash(rawToken))
+        refreshTokenRepository.findByTokenHash(Hashing.sha256Hex(rawToken))
                 .ifPresent(RefreshToken::revoke);
 
     }
@@ -60,16 +61,6 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    private static String hash(String rawToken) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return
-                    HexFormat.of().formatHex(digest.digest(rawToken.getBytes(StandardCharsets.UTF_8)));
 
-        }
-        catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is not available", e);
-        }
-    }
 
 }

@@ -27,12 +27,14 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
     private final RefreshTokenService refreshTokenService;
+    private final LoginAttemptService loginAttemptService;
 
     @Override
     @Transactional
     public RegisterResponse register(RegisterRequest request){
         // Locale.ROOT avoids the Turkish dotless-i problem: "I".toLowerCase() would give "ı"
         String email = request.email().trim().toLowerCase(Locale.ROOT);
+
 
         if(userRepository.existsByEmail(email)){
             log.warn("Registration rejected: email is already in use");
@@ -67,13 +69,19 @@ public class AuthServiceImpl implements AuthService {
     public LoginResult login(LoginRequest request) {
         String email = request.email().trim().toLowerCase(Locale.ROOT);
 
+        if(loginAttemptService.isBlocked(email)){
+            log.warn("Login blocked: too many failed attempts");
+            throw new TooManyLoginAttemptsException();
+        }
+
         User user = userRepository.findByEmail(email)
                 .filter(candidate -> passwordEncoder.matches(request.password(), candidate.getPasswordHash()))
                 .orElseThrow(() -> {
+                    loginAttemptService.recordFailure(email);
                     log.warn("Login rejected: invalid credentials");
                     return new InvalidCredentialsException();
                 });
-
+        loginAttemptService.reset(email);
         log.info("User {} logged in", user.getId());
 
         LoginResponse response = new LoginResponse(user.getId(), user.getTenant().getId(), user.getRole().name());
