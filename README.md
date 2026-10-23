@@ -35,7 +35,7 @@ React dashboard ← API Gateway ← Auth Service · Monitoring Service · AI Ser
 
 | Service | Responsibility | Status |
 |---|---|---|
-| `auth-service` | Tenants, users, roles, JWT authentication | 🟢 Registration done · 🟡 Login in progress |
+| `auth-service` | Tenants, users, roles, JWT authentication | 🟢 Done (registration, login, refresh, logout, rate limiting) |
 | `ingestion-service` | Validates meter readings and publishes them to Kafka | ⚪ Planned |
 | `monitoring-service` | Sites, meters, time-series storage, costs, reports | ⚪ Planned |
 | `alert-service` | Anomaly rules and notifications | ⚪ Planned |
@@ -51,7 +51,7 @@ Target stack for the whole platform. Items marked ✅ are already in use.
 | Area | Technologies |
 |---|---|
 | **Backend** | ✅ Java 21 (virtual threads), ✅ Spring Boot 4, ✅ Spring Security, ✅ Spring Data JPA, ✅ Flyway, ✅ springdoc-openapi, ✅ JWT (RS256, Nimbus), Spring Kafka, WebSocket (STOMP), Spring Cloud Gateway, Spring AI |
-| **Data** | ✅ PostgreSQL 17 + TimescaleDB, Apache Kafka, Redis |
+| **Data** | ✅ PostgreSQL 17 + TimescaleDB, ✅ Redis, Apache Kafka |
 | **Frontend** | React, TypeScript, Vite, TanStack Query, Redux Toolkit, Tailwind CSS, ECharts |
 | **Testing** | ✅ JUnit 5, ✅ Mockito, ✅ AssertJ, ✅ Testcontainers, Vitest, Cypress, k6 |
 | **DevOps** | ✅ Docker, ✅ Docker Compose, ✅ GitHub Actions, Prometheus, Grafana, Loki |
@@ -63,6 +63,12 @@ Interactive API documentation is available at **http://localhost:8081/swagger-ui
 | Method | Endpoint | Description | Responses |
 |---|---|---|---|
 | `POST` | `/api/auth/register` | Registers a company and its first user with the `ADMIN` role | `201` · `400` · `409` |
+| `POST` | `/api/auth/login` | Checks the credentials and sets the `access_token` and `refresh_token` cookies | `200` · `400` · `401` · `429` |
+| `POST` | `/api/auth/refresh` | Exchanges the refresh token cookie for new tokens; the old refresh token is revoked | `200` · `401` |
+| `POST` | `/api/auth/logout` | Revokes the refresh token and clears both cookies | `204` |
+| `GET` | `/api/users/me` | Returns the profile of the signed-in user (requires the access token cookie) | `200` · `401` · `404` |
+
+Tokens are never returned in the response body; the browser stores them as HttpOnly cookies and sends them automatically.
 
 Successful responses share a common envelope:
 
@@ -95,17 +101,22 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 
 **Security**
 - Passwords are hashed with BCrypt (input limited to 72 bytes, BCrypt's maximum).
-- Access tokens are JWTs signed with RS256: only the auth service holds the private key, other services will verify tokens with the public key.
+- Access tokens are short-lived (15 min) JWTs signed with RS256: only the auth service holds the private key, other services will verify tokens with the public key.
+- Tokens travel in `HttpOnly`, `SameSite=Strict` cookies, so JavaScript cannot read them (XSS) and other sites cannot send them (CSRF).
+- Refresh tokens (7 days) are random values stored only as SHA-256 hashes, sent only to `/api/auth`, rotated on every use and revoked on logout.
 - Login returns the same error for an unknown email and a wrong password to prevent user enumeration.
+- Failed logins are limited to 5 per 15 minutes per email with a Redis sliding window (sorted set); Redis keys contain a hash of the email, not the email itself.
 - Emails are normalised with `Locale.ROOT` to avoid the Turkish dotless-i problem.
 
 **Testing** (`./mvnw verify`)
 
 | Level | Example | What it covers |
 |---|---|---|
-| Unit | `AuthServiceImplTest` | Business rules with Mockito; no Spring, no database |
+| Unit | `AuthServiceImplTest`, `RefreshTokenTest` | Business rules with Mockito and entity rules (token expiry and revocation); no Spring, no database |
 | Web layer | `AuthControllerTest` | HTTP status codes, validation and JSON shape with `@WebMvcTest` and a mocked service |
-| Integration | `RegistrationIntegrationTest` | Full request through to a real TimescaleDB started by Testcontainers |
+| Integration | `RegistrationIntegrationTest`, `LoginIntegrationTest`, `RefreshAndLogoutIntegrationTest`, `LoginRateLimitIntegrationTest` | Full user journeys (register → login → protected endpoint → refresh → logout, rate limiting) against real TimescaleDB and Redis started by Testcontainers |
+
+Error cases are tested alongside the happy paths: wrong credentials, missing or reused tokens, malformed requests and too many attempts.
 
 **Logging**
 - SLF4J logs for business events (`INFO`), rejected requests (`WARN`) and unexpected errors with stack traces (`ERROR`).
@@ -130,7 +141,7 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 docker compose up -d
 ```
 
-This starts TimescaleDB (PostgreSQL 17) and Redis. The init script in `infra/postgres/init` creates one database per service (`auth_db`, `monitoring_db`, `alert_db`).
+This starts TimescaleDB (PostgreSQL 17) and Redis (used for login rate limiting). The init script in `infra/postgres/init` creates one database per service (`auth_db`, `monitoring_db`, `alert_db`).
 
 | Service | Host port | Credentials |
 |---|---|---|
@@ -172,8 +183,8 @@ Tests run against a real TimescaleDB instance started automatically with Testcon
 - [x] Local infrastructure with Docker Compose (TimescaleDB, Redis)
 - [x] Company registration with validation, problem-detail errors and tests
 - [x] API documentation with OpenAPI / Swagger UI
-- [ ] Authentication: login with JWT in HttpOnly cookies, refresh and logout (in progress)
-- [ ] Login rate limiting with Redis
+- [x] Authentication: login with JWT in HttpOnly cookies, refresh token rotation and logout
+- [x] Login rate limiting with Redis (sliding window)
 - [ ] Site and meter management, data simulator
 - [ ] Kafka-based ingestion and time-series storage
 - [ ] Dashboard with charts and KPIs
