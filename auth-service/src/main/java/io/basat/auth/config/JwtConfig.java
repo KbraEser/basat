@@ -23,8 +23,13 @@ public class JwtConfig {
     private final RSAKey rsaKey = generateRsaKey();
 
     @Bean
-    public JwtEncoder jwtEncoder() {
-        JWKSource<SecurityContext> jwkSource = new ImmutableJWKSet<>(new JWKSet(rsaKey));
+    public JWKSet jwkSet() {
+        return new JWKSet(rsaKey);
+    }
+
+    @Bean
+    public JwtEncoder jwtEncoder(JWKSet jwkSet) {
+        JWKSource<SecurityContext> jwkSource = new ImmutableJWKSet<>(jwkSet);
         return new NimbusJwtEncoder(jwkSource);
     }
 
@@ -40,4 +45,5 @@ public class JwtConfig {
             throw new IllegalStateException("Could not generate RSA key", e);
         }
     }
+
 }
