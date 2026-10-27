@@ -31,6 +31,7 @@
 
     <modules>
         <module>auth-service</module>
+        <module>monitoring-service</module>
     </modules>
 
     <dependencyManagement>
