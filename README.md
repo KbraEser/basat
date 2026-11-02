@@ -37,7 +37,7 @@ React dashboard ← API Gateway ← Auth Service · Monitoring Service · AI Ser
 |---|---|---|
 | `auth-service` | Tenants, users, roles, JWT authentication | 🟢 Done (registration, login, refresh, logout, rate limiting) |
 | `ingestion-service` | Validates meter readings and publishes them to Kafka | ⚪ Planned |
-| `monitoring-service` | Sites, meters, time-series storage, costs, reports | ⚪ Planned |
+| `monitoring-service` | Sites, meters, time-series storage, costs, reports | 🟡 In progress (token validation done, site management in progress) |
 | `alert-service` | Anomaly rules and notifications | ⚪ Planned |
 | `ai-service` | AI assistant with tool calling over real data | ⚪ Planned |
 | `api-gateway` | Single entry point, routing, rate limiting | ⚪ Planned |
@@ -67,6 +67,7 @@ Interactive API documentation is available at **http://localhost:8081/swagger-ui
 | `POST` | `/api/auth/refresh` | Exchanges the refresh token cookie for new tokens; the old refresh token is revoked | `200` · `401` |
 | `POST` | `/api/auth/logout` | Revokes the refresh token and clears both cookies | `204` |
 | `GET` | `/api/users/me` | Returns the profile of the signed-in user (requires the access token cookie) | `200` · `401` · `404` |
+| `GET` | `/.well-known/jwks.json` | Publishes the public key that other services use to verify access tokens | `200` |
 
 Tokens are never returned in the response body; the browser stores them as HttpOnly cookies and sends them automatically.
 
@@ -94,26 +95,31 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 ## Engineering practices
 
 **Architecture**
-- Code is packaged by feature (`authentication`, `tenant`, `user`, `token`), not by layer.
+- Code is packaged by feature (`authentication`, `tenant`, `user`, `token` in auth-service; `site` in monitoring-service), not by layer.
 - Controllers depend on service interfaces (`AuthService` → `AuthServiceImpl`), which keeps layers decoupled and lets the web layer be tested with mocks.
 - Entities are never exposed by the API; requests and responses use dedicated DTOs (Java records).
 - Database schema changes are versioned with Flyway; Hibernate only validates the schema.
 
 **Security**
 - Passwords are hashed with BCrypt (input limited to 72 bytes, BCrypt's maximum).
-- Access tokens are short-lived (15 min) JWTs signed with RS256: only the auth service holds the private key, other services will verify tokens with the public key.
+- Access tokens are short-lived (15 min) JWTs signed with RS256. Only the auth service holds the private key; other services fetch the public key from its JWKS endpoint and verify every token locally, so no secret is shared and the auth service is not called on each request.
 - Tokens travel in `HttpOnly`, `SameSite=Strict` cookies, so JavaScript cannot read them (XSS) and other sites cannot send them (CSRF).
 - Refresh tokens (7 days) are random values stored only as SHA-256 hashes, sent only to `/api/auth`, rotated on every use and revoked on logout.
 - Login returns the same error for an unknown email and a wrong password to prevent user enumeration.
 - Failed logins are limited to 5 per 15 minutes per email with a Redis sliding window (sorted set); Redis keys contain a hash of the email, not the email itself.
 - Emails are normalised with `Locale.ROOT` to avoid the Turkish dotless-i problem.
 
+**Multi-tenancy**
+- All companies share the same tables; every row carries a `tenant_id`.
+- The tenant is always taken from the verified access token, never from the request body, so a user cannot act on behalf of another company.
+- Every query is filtered by tenant; another company's resource is reported as not found (`404`) rather than forbidden, so its existence is not revealed.
+
 **Testing** (`./mvnw verify`)
 
 | Level | Example | What it covers |
 |---|---|---|
 | Unit | `AuthServiceImplTest`, `RefreshTokenTest` | Business rules with Mockito and entity rules (token expiry and revocation); no Spring, no database |
-| Web layer | `AuthControllerTest` | HTTP status codes, validation and JSON shape with `@WebMvcTest` and a mocked service |
+| Web layer | `AuthControllerTest`, `JwksControllerTest`, `SecurityConfigTest` | HTTP status codes, validation, JSON shape and token checks with `@WebMvcTest` and a mocked service |
 | Integration | `RegistrationIntegrationTest`, `LoginIntegrationTest`, `RefreshAndLogoutIntegrationTest`, `LoginRateLimitIntegrationTest` | Full user journeys (register → login → protected endpoint → refresh → logout, rate limiting) against real TimescaleDB and Redis started by Testcontainers |
 
 Error cases are tested alongside the happy paths: wrong credentials, missing or reused tokens, malformed requests and too many attempts.
@@ -150,13 +156,24 @@ This starts TimescaleDB (PostgreSQL 17) and Redis (used for login rate limiting)
 
 TimescaleDB is mapped to `5433` so it does not clash with a PostgreSQL instance already running on `5432`.
 
-### Run the auth service
+### Run the services
+
+Start each service in its own terminal:
 
 ```bash
 ./mvnw -pl auth-service spring-boot:run
 ```
 
-The service listens on port `8081` and applies the Flyway migrations to `auth_db` on startup. The connection can be overridden with the `DB_URL`, `DB_USERNAME` and `DB_PASSWORD` environment variables.
+```bash
+./mvnw -pl monitoring-service spring-boot:run
+```
+
+| Service | Port | Database |
+|---|---|---|
+| `auth-service` | `8081` | `auth_db` |
+| `monitoring-service` | `8082` | `monitoring_db` |
+
+Each service applies its own Flyway migrations on startup. The connection can be overridden with the `DB_URL`, `DB_USERNAME` and `DB_PASSWORD` environment variables; monitoring-service finds the auth service's public key through `AUTH_JWKS_URI` (default `http://localhost:8081/.well-known/jwks.json`).
 
 Try it with the Swagger UI at http://localhost:8081/swagger-ui.html, or with curl:
 
@@ -185,6 +202,7 @@ Tests run against a real TimescaleDB instance started automatically with Testcon
 - [x] API documentation with OpenAPI / Swagger UI
 - [x] Authentication: login with JWT in HttpOnly cookies, refresh token rotation and logout
 - [x] Login rate limiting with Redis (sliding window)
+- [x] Service-to-service token validation with JWKS
 - [ ] Site and meter management, data simulator
 - [ ] Kafka-based ingestion and time-series storage
 - [ ] Dashboard with charts and KPIs
