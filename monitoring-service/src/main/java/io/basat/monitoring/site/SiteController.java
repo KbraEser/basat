@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -55,10 +56,15 @@ public class SiteController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "409", description = "The company already has a site with this name",
                     content = @Content(mediaType = "application/problem+json",
-                            schema = @Schema(implementation = ProblemDetail.class)))
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403", description = "Only ADMIN and ENERGY_MANAGER can change sites",
+                    content = @Content(mediaType = "application/problem+json",
+                            schema = @Schema(implementation = ProblemDetail.class))),
     })
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN', 'ENERGY_MANAGER')")
     public ApiResponse<SiteResponse> createSite(@AuthenticationPrincipal Jwt jwt,
                                                 @Valid @RequestBody SiteRequest request) {
         return ApiResponse.of(siteService.createSite(TokenClaims.tenantId(jwt), request), "Site created");
@@ -78,9 +84,14 @@ public class SiteController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "409", description = "Another site of the company already has this name",
                     content = @Content(mediaType = "application/problem+json",
-                            schema = @Schema(implementation = ProblemDetail.class)))
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403", description = "Only ADMIN and ENERGY_MANAGER can change sites",
+                    content = @Content(mediaType = "application/problem+json",
+                            schema = @Schema(implementation = ProblemDetail.class))),
     })
     @PutMapping("/{siteId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ENERGY_MANAGER')")
     public ApiResponse<SiteResponse> updateSite(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID siteId,
                                                 @Valid @RequestBody SiteRequest request) {
         return ApiResponse.of(siteService.updateSite(TokenClaims.tenantId(jwt), siteId, request), "Site updated");
@@ -92,10 +103,15 @@ public class SiteController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "404", description = "Site does not exist or belongs to another company",
                     content = @Content(mediaType = "application/problem+json",
-                            schema = @Schema(implementation = ProblemDetail.class)))
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403", description = "Only ADMIN and ENERGY_MANAGER can change sites",
+                    content = @Content(mediaType = "application/problem+json",
+                            schema = @Schema(implementation = ProblemDetail.class))),
     })
     @DeleteMapping("/{siteId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('ADMIN', 'ENERGY_MANAGER')")
     public void deleteSite(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID siteId) {
         siteService.deleteSite(TokenClaims.tenantId(jwt), siteId);
     }
