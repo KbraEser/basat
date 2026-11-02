@@ -37,7 +37,7 @@ public class SiteServiceImpl implements SiteService {
             log.warn("Site creation rejected for tenant {}: name already used", tenantId);            throw new SiteNameAlreadyUsedException(name);
         }
 
-        Site site = siteRepository.save(new Site(tenantId,name,request.type(),request.floorAreaM2(), request.city()));
+        Site site = siteRepository.saveAndFlush(new Site(tenantId,name,request.type(),request.floorAreaM2(), request.city()));
 
         log.info("Site {} created for tenant {}", site.getId(), tenantId);
 
