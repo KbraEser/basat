@@ -9,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -26,7 +27,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * End-to-end tests for site management against a real TimescaleDB started by Testcontainers.
  * <p>
- * Tokens are simulated with {@code jwt()}: two random tenant ids stand for two different companies.
+ * Tokens are simulated with {@code jwt()}: two random tenant ids stand for two different companies,
+ * and the role claim decides which actions are allowed.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -37,8 +39,9 @@ class SiteIntegrationTest {
             {"name":"Antalya Otel","type":"HOTEL","floorAreaM2":12500.50,"city":"Antalya"}
             """;
 
-    private final JwtRequestPostProcessor companyA = tokenFor(UUID.randomUUID());
-    private final JwtRequestPostProcessor companyB = tokenFor(UUID.randomUUID());
+    private final UUID companyAId = UUID.randomUUID();
+    private final JwtRequestPostProcessor companyA = tokenFor(companyAId, "ADMIN");
+    private final JwtRequestPostProcessor companyB = tokenFor(UUID.randomUUID(), "ADMIN");
 
     @Autowired
     private MockMvc mockMvc;
@@ -151,6 +154,34 @@ class SiteIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void viewer_canReadSites_butCannotChangeThem() throws Exception {
+        String siteId = createSite(companyA, HOTEL);
+        JwtRequestPostProcessor viewer = tokenFor(companyAId, "VIEWER");
+
+        mockMvc.perform(get("/api/sites").with(viewer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1));
+
+        mockMvc.perform(post("/api/sites").with(viewer)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Bodrum Otel","type":"HOTEL"}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("Forbidden"));
+        mockMvc.perform(put("/api/sites/" + siteId).with(viewer)
+                        .contentType(MediaType.APPLICATION_JSON).content(HOTEL))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/sites/" + siteId).with(viewer))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void energyManager_canCreateSites() throws Exception {
+        createSite(tokenFor(companyAId, "ENERGY_MANAGER"), HOTEL);
+    }
+
     private String createSite(JwtRequestPostProcessor company, String body) throws Exception {
         String response = mockMvc.perform(post("/api/sites").with(company)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
@@ -160,7 +191,10 @@ class SiteIntegrationTest {
         return JsonPath.read(response, "$.data.id");
     }
 
-    private static JwtRequestPostProcessor tokenFor(UUID tenantId) {
-        return jwt().jwt(token -> token.claim("tenantId", tenantId.toString()));
+    private static JwtRequestPostProcessor tokenFor(UUID tenantId, String role) {
+        // jwt() skips the JwtAuthenticationConverter, so the authority is set here the same way it maps "role"
+        return jwt()
+                .jwt(token -> token.claim("tenantId", tenantId.toString()).claim("role", role))
+                .authorities(new SimpleGrantedAuthority("ROLE_" + role));
     }
 }
