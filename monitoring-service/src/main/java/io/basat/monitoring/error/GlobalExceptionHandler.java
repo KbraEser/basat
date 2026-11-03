@@ -34,6 +34,13 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(SerialNumberAlreadyUsedException.class)
+    public ProblemDetail handleSerialNumberAlreadyUsed(SerialNumberAlreadyUsedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Serial number already used");
+        return problem;
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new LinkedHashMap<>();
@@ -94,7 +101,4 @@ public class GlobalExceptionHandler {
         problem.setTitle("Forbidden");
         return problem;
     }
-
-
-
 }
