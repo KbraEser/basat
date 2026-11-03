@@ -39,7 +39,8 @@ public interface SiteService {
     /**
      * Deletes a site.
      *
-     * @throws SiteNotFoundException if the site does not exist or belongs to another company
+     * @throws SiteNotFoundException  if the site does not exist or belongs to another company
+     * @throws SiteHasMetersException if the site still has meters
      */
     void deleteSite(UUID tenantId, UUID siteId);
 }

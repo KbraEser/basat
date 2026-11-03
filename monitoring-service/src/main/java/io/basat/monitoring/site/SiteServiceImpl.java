@@ -1,6 +1,6 @@
 package io.basat.monitoring.site;
 
-
+import io.basat.monitoring.meter.MeterRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -15,6 +15,7 @@ import java.util.UUID;
 public class SiteServiceImpl implements SiteService {
 
     private final SiteRepository siteRepository;
+    private final MeterRepository meterRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -63,7 +64,13 @@ public class SiteServiceImpl implements SiteService {
     @Override
     @Transactional
     public void deleteSite(UUID tenantId, UUID siteId) {
-        siteRepository.delete(findSite(tenantId, siteId));
+        Site site = findSite(tenantId, siteId);
+        // meters keep the site's readings; deleting them silently would lose consumption history
+        if (meterRepository.existsBySiteId(siteId)) {
+            log.warn("Site {} deletion rejected: it still has meters", siteId);
+            throw new SiteHasMetersException(siteId);
+        }
+        siteRepository.delete(site);
         log.info("Site {} deleted", siteId);
     }
 

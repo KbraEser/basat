@@ -108,6 +108,10 @@ public class SiteController {
                     responseCode = "403", description = "Only ADMIN and ENERGY_MANAGER can change sites",
                     content = @Content(mediaType = "application/problem+json",
                             schema = @Schema(implementation = ProblemDetail.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "409", description = "The site still has meters",
+                    content = @Content(mediaType = "application/problem+json",
+                            schema = @Schema(implementation = ProblemDetail.class)))
     })
     @DeleteMapping("/{siteId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
