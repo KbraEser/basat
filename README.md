@@ -37,7 +37,7 @@ React dashboard ← API Gateway ← Auth Service · Monitoring Service · AI Ser
 |---|---|---|
 | `auth-service` | Tenants, users, roles, JWT authentication | 🟢 Done (registration, login, refresh, logout, rate limiting) |
 | `ingestion-service` | Validates meter readings and publishes them to Kafka | ⚪ Planned |
-| `monitoring-service` | Sites, meters, time-series storage, costs, reports | 🟡 In progress (token validation done, site management in progress) |
+| `monitoring-service` | Sites, meters, time-series storage, costs, reports | 🟡 In progress (token validation, site and meter management done; time-series storage next) |
 | `alert-service` | Anomaly rules and notifications | ⚪ Planned |
 | `ai-service` | AI assistant with tool calling over real data | ⚪ Planned |
 | `api-gateway` | Single entry point, routing, rate limiting | ⚪ Planned |
@@ -58,7 +58,12 @@ Target stack for the whole platform. Items marked ✅ are already in use.
 
 ## API
 
-Interactive API documentation is available at **http://localhost:8081/swagger-ui.html** when the auth service is running (raw OpenAPI spec: `/v3/api-docs`).
+Each service publishes interactive API documentation while it is running (raw OpenAPI spec at `/v3/api-docs`):
+
+- auth-service: **http://localhost:8081/swagger-ui.html**
+- monitoring-service: **http://localhost:8082/swagger-ui.html**
+
+### Auth service
 
 | Method | Endpoint | Description | Responses |
 |---|---|---|---|
@@ -70,6 +75,35 @@ Interactive API documentation is available at **http://localhost:8081/swagger-ui
 | `GET` | `/.well-known/jwks.json` | Publishes the public key that other services use to verify access tokens | `200` |
 
 Tokens are never returned in the response body; the browser stores them as HttpOnly cookies and sends them automatically.
+
+### Monitoring service
+
+All endpoints require the access token cookie and only return data of the signed-in user's company.
+
+| Method | Endpoint | Description | Responses |
+|---|---|---|---|
+| `GET` | `/api/sites` | Lists the company's sites, ordered by name | `200` · `401` |
+| `POST` | `/api/sites` | Creates a site (name, type, floor area, city); names are unique within a company | `201` · `400` · `403` · `409` |
+| `GET` | `/api/sites/{siteId}` | Returns one site | `200` · `404` |
+| `PUT` | `/api/sites/{siteId}` | Replaces the details of a site | `200` · `400` · `403` · `404` · `409` |
+| `DELETE` | `/api/sites/{siteId}` | Deletes a site; rejected while the site still has meters | `204` · `403` · `404` · `409` |
+| `GET` | `/api/sites/{siteId}/meters` | Lists the meters of a site | `200` · `404` |
+| `POST` | `/api/sites/{siteId}/meters` | Adds a meter to a site; serial numbers are unique across the platform | `201` · `400` · `403` · `404` · `409` |
+| `GET` | `/api/meters/{meterId}` | Returns one meter | `200` · `404` |
+| `PUT` | `/api/meters/{meterId}` | Replaces the details of a meter | `200` · `400` · `403` · `404` · `409` |
+| `DELETE` | `/api/meters/{meterId}` | Deletes a meter | `204` · `403` · `404` |
+
+Meters are created under their site and then addressed directly by their own ID, which keeps URLs short without losing the parent relation.
+
+### Roles
+
+| Role | Sites and meters |
+|---|---|
+| `ADMIN` | Read and change |
+| `ENERGY_MANAGER` | Read and change |
+| `VIEWER` | Read only (changes return `403`) |
+
+The role is a claim in the access token and is checked with `@PreAuthorize` on each endpoint.
 
 Successful responses share a common envelope:
 
@@ -95,7 +129,7 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 ## Engineering practices
 
 **Architecture**
-- Code is packaged by feature (`authentication`, `tenant`, `user`, `token` in auth-service; `site` in monitoring-service), not by layer.
+- Code is packaged by feature (`authentication`, `tenant`, `user`, `token` in auth-service; `site`, `meter` in monitoring-service), not by layer.
 - Controllers depend on service interfaces (`AuthService` → `AuthServiceImpl`), which keeps layers decoupled and lets the web layer be tested with mocks.
 - Entities are never exposed by the API; requests and responses use dedicated DTOs (Java records).
 - Database schema changes are versioned with Flyway; Hibernate only validates the schema.
@@ -108,11 +142,17 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 - Login returns the same error for an unknown email and a wrong password to prevent user enumeration.
 - Failed logins are limited to 5 per 15 minutes per email with a Redis sliding window (sorted set); Redis keys contain a hash of the email, not the email itself.
 - Emails are normalised with `Locale.ROOT` to avoid the Turkish dotless-i problem.
+- Role-based access: write operations require `ADMIN` or `ENERGY_MANAGER`; a missing role returns a `403` problem detail.
 
 **Multi-tenancy**
 - All companies share the same tables; every row carries a `tenant_id`.
 - The tenant is always taken from the verified access token, never from the request body, so a user cannot act on behalf of another company.
 - Every query is filtered by tenant; another company's resource is reported as not found (`404`) rather than forbidden, so its existence is not revealed.
+- Meters have no tenant column of their own: they belong to a site, and every meter query joins through the site's `tenant_id`, so a meter can never end up in a different company than its site.
+
+**Data integrity**
+- Business rules are checked in the service layer with clear `409` messages (duplicate site name, duplicate serial number, deleting a site that still has meters); database constraints (`UNIQUE`, foreign keys without cascade) remain as the last line of defence.
+- Meter serial numbers are stored in one canonical form (trimmed, upper case), so `em-2024-001` and `EM-2024-001` count as the same device.
 
 **Testing** (`./mvnw verify`)
 
@@ -120,9 +160,9 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 |---|---|---|
 | Unit | `AuthServiceImplTest`, `RefreshTokenTest` | Business rules with Mockito and entity rules (token expiry and revocation); no Spring, no database |
 | Web layer | `AuthControllerTest`, `JwksControllerTest`, `SecurityConfigTest` | HTTP status codes, validation, JSON shape and token checks with `@WebMvcTest` and a mocked service |
-| Integration | `RegistrationIntegrationTest`, `LoginIntegrationTest`, `RefreshAndLogoutIntegrationTest`, `LoginRateLimitIntegrationTest` | Full user journeys (register → login → protected endpoint → refresh → logout, rate limiting) against real TimescaleDB and Redis started by Testcontainers |
+| Integration | `RegistrationIntegrationTest`, `LoginIntegrationTest`, `RefreshAndLogoutIntegrationTest`, `LoginRateLimitIntegrationTest`, `SiteIntegrationTest`, `MeterIntegrationTest` | Full user journeys (register → login → protected endpoint → refresh → logout, rate limiting) and site/meter management (tenant isolation, roles, uniqueness rules) against real TimescaleDB and Redis started by Testcontainers |
 
-Error cases are tested alongside the happy paths: wrong credentials, missing or reused tokens, malformed requests and too many attempts.
+Error cases are tested alongside the happy paths: wrong credentials, missing or reused tokens, malformed requests, too many attempts, another company's data and missing roles.
 
 **Logging**
 - SLF4J logs for business events (`INFO`), rejected requests (`WARN`) and unexpected errors with stack traces (`ERROR`).
@@ -203,7 +243,8 @@ Tests run against a real TimescaleDB instance started automatically with Testcon
 - [x] Authentication: login with JWT in HttpOnly cookies, refresh token rotation and logout
 - [x] Login rate limiting with Redis (sliding window)
 - [x] Service-to-service token validation with JWKS
-- [ ] Site and meter management, data simulator
+- [x] Site and meter management with tenant isolation and role-based access
+- [ ] Data simulator with realistic consumption profiles
 - [ ] Kafka-based ingestion and time-series storage
 - [ ] Dashboard with charts and KPIs
 - [ ] Real-time updates over WebSocket
@@ -211,6 +252,7 @@ Tests run against a real TimescaleDB instance started automatically with Testcon
 - [ ] Tariffs, costs and reports
 - [ ] AI assistant
 - [ ] Monitoring, deployment and live demo
+- [ ] Site-level access (e.g. a branch manager who only sees their own site)
 
 ## Why "Basat"?
 
