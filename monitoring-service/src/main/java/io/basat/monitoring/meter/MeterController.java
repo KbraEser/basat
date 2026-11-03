@@ -81,4 +81,49 @@ public class MeterController {
         return ApiResponse.of(meterService.createMeter(TokenClaims.tenantId(jwt), siteId, request),"Meter created successfully");
     }
 
+    @Operation(summary = "Update a meter", description = "Replaces the details of the meter; it stays at its site.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Meter updated"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "Validation failed",
+                    content = @Content(mediaType = "application/problem+json",
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403", description = "Viewers cannot change meters",
+                    content = @Content(mediaType = "application/problem+json",
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404", description = "Meter does not exist or belongs to another company",
+                    content = @Content(mediaType = "application/problem+json",
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "409", description = "Another meter already has this serial number",
+                    content = @Content(mediaType = "application/problem+json",
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    @PutMapping("/meters/{meterId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ENERGY_MANAGER')")
+    public ApiResponse<MeterResponse> updateMeter(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID meterId,
+                                                  @Valid @RequestBody MeterRequest request) {
+        return ApiResponse.of(meterService.updateMeter(TokenClaims.tenantId(jwt), meterId, request), "Meter updated");
+    }
+
+    @Operation(summary = "Delete a meter")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "Meter deleted"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403", description = "Viewers cannot delete meters",
+                    content = @Content(mediaType = "application/problem+json",
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404", description = "Meter does not exist or belongs to another company",
+                    content = @Content(mediaType = "application/problem+json",
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    @DeleteMapping("/meters/{meterId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('ADMIN', 'ENERGY_MANAGER')")
+    public void deleteMeter(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID meterId) {
+        meterService.deleteMeter(TokenClaims.tenantId(jwt), meterId);
+    }
 }
