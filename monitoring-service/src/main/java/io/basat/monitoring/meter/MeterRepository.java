@@ -9,6 +9,7 @@ import java.util.UUID;
 public interface MeterRepository extends JpaRepository<Meter, UUID> {
 
     List<Meter> findAllBySiteIdOrderByName(UUID siteId);
+    // SiteTenantId walks the relation: meters.site_id -> sites.tenant_id
     Optional<Meter> findByIdAndSiteTenantId(UUID uuid,  UUID tenantId);
     boolean existsBySerialNumber(String serialNumber);
     boolean existsBySerialNumberAndIdNot(String serialNumber, UUID id);
