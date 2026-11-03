@@ -1,5 +1,6 @@
 package io.basat.monitoring.error;
 
+import io.basat.monitoring.site.SiteHasMetersException;
 import io.basat.monitoring.site.SiteNameAlreadyUsedException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -31,6 +32,20 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleSiteNameAlreadyUsed(SiteNameAlreadyUsedException ex){
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problem.setTitle("Site name already used");
+        return problem;
+    }
+
+    @ExceptionHandler(SiteHasMetersException.class)
+    public ProblemDetail handleSiteHasMeters(SiteHasMetersException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Site has meters");
+        return problem;
+    }
+
+    @ExceptionHandler(SerialNumberAlreadyUsedException.class)
+    public ProblemDetail handleSerialNumberAlreadyUsed(SerialNumberAlreadyUsedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Serial number already used");
         return problem;
     }
 
@@ -94,7 +109,4 @@ public class GlobalExceptionHandler {
         problem.setTitle("Forbidden");
         return problem;
     }
-
-
-
 }
