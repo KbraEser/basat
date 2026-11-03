@@ -2,6 +2,7 @@ package io.basat.monitoring.site;
 
 import com.jayway.jsonpath.JsonPath;
 import io.basat.monitoring.TestcontainersConfiguration;
+import io.basat.monitoring.meter.MeterRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,8 +50,13 @@ class SiteIntegrationTest {
     @Autowired
     private SiteRepository siteRepository;
 
+    @Autowired
+    private MeterRepository meterRepository;
+
     @AfterEach
     void cleanUp() {
+        // meters first: the foreign key does not let a site with meters be deleted
+        meterRepository.deleteAll();
         siteRepository.deleteAll();
     }
 
