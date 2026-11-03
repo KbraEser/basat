@@ -1,0 +1,16 @@
+package io.basat.monitoring.meter;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface MeterRepository extends JpaRepository<Meter, UUID> {
+
+    List<Meter> findAllBySiteIdOrderByName(UUID siteId);
+    Optional<Meter> findByIdAndSiteTenantId(UUID uuid,  UUID tenantId);
+    boolean existsBySerialNumber(String serialNumber);
+    boolean existsBySerialNumberAndIdNot(String serialNumber, UUID id);
+    boolean existsBySiteId(UUID siteId);
+}
