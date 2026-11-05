@@ -1,3 +1,19 @@
 spring:
   application:
     name: simulator
+  main:
+    web-application-type: none
+
+simulator:
+  ingestion-url: http://localhost:8083
+  interval: 10s
+  meters:
+    - serial-number: EM-2024-001
+      profile: HOTEL
+      installed-kw: 250
+    - serial-number: EM-2024-002
+      profile: OFFICE
+      installed-kw: 100
+    - serial-number: GES-2024-001
+      profile: SOLAR
+      installed-kw: 50
