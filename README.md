@@ -36,12 +36,12 @@ React dashboard ← API Gateway ← Auth Service · Monitoring Service · AI Ser
 | Service | Responsibility | Status |
 |---|---|---|
 | `auth-service` | Tenants, users, roles, JWT authentication | 🟢 Done (registration, login, refresh, logout, rate limiting) |
-| `ingestion-service` | Validates meter readings and publishes them to Kafka | ⚪ Planned |
+| `ingestion-service` | Validates meter readings and publishes them to Kafka | 🟡 In progress (REST endpoint and validation done; Kafka publishing next) |
 | `monitoring-service` | Sites, meters, time-series storage, costs, reports | 🟡 In progress (token validation, site and meter management done; time-series storage next) |
 | `alert-service` | Anomaly rules and notifications | ⚪ Planned |
 | `ai-service` | AI assistant with tool calling over real data | ⚪ Planned |
 | `api-gateway` | Single entry point, routing, rate limiting | ⚪ Planned |
-| `simulator` | Replays real building data and injects anomalies | ⚪ Planned |
+| `simulator` | Generates realistic meter readings; later replays real building data and injects anomalies | 🟡 In progress (synthetic office, hotel and solar profiles done) |
 | `frontend` | React dashboard | ⚪ Planned |
 
 ## Tech stack
@@ -62,6 +62,7 @@ Each service publishes interactive API documentation while it is running (raw Op
 
 - auth-service: **http://localhost:8081/swagger-ui.html**
 - monitoring-service: **http://localhost:8082/swagger-ui.html**
+- ingestion-service: **http://localhost:8083/swagger-ui.html**
 
 ### Auth service
 
@@ -94,6 +95,14 @@ All endpoints require the access token cookie and only return data of the signed
 | `DELETE` | `/api/meters/{meterId}` | Deletes a meter | `204` · `403` · `404` |
 
 Meters are created under their site and then addressed directly by their own ID, which keeps URLs short without losing the parent relation.
+
+### Ingestion service
+
+| Method | Endpoint | Description | Responses |
+|---|---|---|---|
+| `POST` | `/api/readings` | Accepts one meter reading (serial number, end of interval, kWh) and hands it on for processing | `202` · `400` |
+
+The endpoint answers `202 Accepted` because the reading is processed asynchronously. It is called by meter data loggers (the simulator for now), not by users; device authentication with API keys is planned.
 
 ### Roles
 
@@ -129,8 +138,9 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 ## Engineering practices
 
 **Architecture**
-- Code is packaged by feature (`authentication`, `tenant`, `user`, `token` in auth-service; `site`, `meter` in monitoring-service), not by layer.
+- Code is packaged by feature (`authentication`, `tenant`, `user`, `token` in auth-service; `site`, `meter` in monitoring-service; `reading` in ingestion-service; `profile`, `reading` in the simulator), not by layer.
 - Controllers depend on service interfaces (`AuthService` → `AuthServiceImpl`), which keeps layers decoupled and lets the web layer be tested with mocks.
+- The ingestion controller only knows the `ReadingPublisher` interface: readings are logged for now, and the Kafka publisher will replace the implementation without changing the controller or its tests.
 - Entities are never exposed by the API; requests and responses use dedicated DTOs (Java records).
 - Database schema changes are versioned with Flyway; Hibernate only validates the schema.
 
@@ -143,6 +153,12 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 - Failed logins are limited to 5 per 15 minutes per email with a Redis sliding window (sorted set); Redis keys contain a hash of the email, not the email itself.
 - Emails are normalised with `Locale.ROOT` to avoid the Turkish dotless-i problem.
 - Role-based access: write operations require `ADMIN` or `ENERGY_MANAGER`; a missing role returns a `403` problem detail.
+
+**Simulator**
+- Each building type is a `ConsumptionProfile` (Strategy pattern): `OfficeProfile`, `HotelProfile` and `SolarProfile` return the share of installed power in use at a given local time. The reading generator receives all profiles from Spring as a list and never names them, so a new profile is added without touching it.
+- The profiles use HVAC domain knowledge: a base load that never switches off, occupancy (office hours, hotel breakfast and evening peaks, quiet weekends in offices) and a cooling load that follows the season and the daily temperature curve. Solar production follows the day length and sun height of central Türkiye.
+- Meters are configured in `application.yaml` (serial number, profile, installed kW) and validated at startup; every 10 seconds one reading per meter (±5 % noise) is sent to the ingestion service with `RestClient`. A failed send is logged and the simulation keeps running, like a real data logger.
+- The profiles are an approximation. Replaying measured data from the [Building Data Genome Project 2](https://github.com/buds-lab/building-data-genome-project-2) and injecting labelled anomalies is planned for the alert and ML work.
 
 **Multi-tenancy**
 - All companies share the same tables; every row carries a `tenant_id`.
@@ -158,8 +174,9 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 
 | Level | Example | What it covers |
 |---|---|---|
-| Unit | `AuthServiceImplTest`, `RefreshTokenTest` | Business rules with Mockito and entity rules (token expiry and revocation); no Spring, no database |
-| Web layer | `AuthControllerTest`, `JwksControllerTest`, `SecurityConfigTest` | HTTP status codes, validation, JSON shape and token checks with `@WebMvcTest` and a mocked service |
+| Unit | `AuthServiceImplTest`, `RefreshTokenTest`, `OfficeProfileTest`, `ReadingGeneratorTest` | Business rules with Mockito, entity rules (token expiry and revocation) and simulator calculations (load curves, energy per interval); no Spring, no database |
+| Web layer | `AuthControllerTest`, `JwksControllerTest`, `SecurityConfigTest`, `ReadingControllerTest` | HTTP status codes, validation, JSON shape and token checks with `@WebMvcTest` and a mocked service |
+| HTTP client | `IngestionClientTest` | The exact request the simulator sends, and that a failing server does not stop it, with `@RestClientTest` and `MockRestServiceServer` |
 | Integration | `RegistrationIntegrationTest`, `LoginIntegrationTest`, `RefreshAndLogoutIntegrationTest`, `LoginRateLimitIntegrationTest`, `SiteIntegrationTest`, `MeterIntegrationTest` | Full user journeys (register → login → protected endpoint → refresh → logout, rate limiting) and site/meter management (tenant isolation, roles, uniqueness rules) against real TimescaleDB and Redis started by Testcontainers |
 
 Error cases are tested alongside the happy paths: wrong credentials, missing or reused tokens, malformed requests, too many attempts, another company's data and missing roles.
@@ -208,10 +225,20 @@ Start each service in its own terminal:
 ./mvnw -pl monitoring-service spring-boot:run
 ```
 
+```bash
+./mvnw -pl ingestion-service spring-boot:run
+```
+
+```bash
+./mvnw -pl simulator spring-boot:run
+```
+
 | Service | Port | Database |
 |---|---|---|
 | `auth-service` | `8081` | `auth_db` |
 | `monitoring-service` | `8082` | `monitoring_db` |
+| `ingestion-service` | `8083` | none |
+| `simulator` | none (no web server) | none |
 
 Each service applies its own Flyway migrations on startup. The connection can be overridden with the `DB_URL`, `DB_USERNAME` and `DB_PASSWORD` environment variables; monitoring-service finds the auth service's public key through `AUTH_JWKS_URI` (default `http://localhost:8081/.well-known/jwks.json`).
 
@@ -244,15 +271,18 @@ Tests run against a real TimescaleDB instance started automatically with Testcon
 - [x] Login rate limiting with Redis (sliding window)
 - [x] Service-to-service token validation with JWKS
 - [x] Site and meter management with tenant isolation and role-based access
-- [ ] Data simulator with realistic consumption profiles
+- [x] Reading ingestion endpoint with validation
+- [x] Data simulator with realistic consumption profiles (office, hotel, solar)
 - [ ] Kafka-based ingestion and time-series storage
 - [ ] Dashboard with charts and KPIs
 - [ ] Real-time updates over WebSocket
 - [ ] Alerts and notifications
+- [ ] Replay of real building data (BDG2) with injected anomalies
 - [ ] Tariffs, costs and reports
 - [ ] AI assistant
 - [ ] Monitoring, deployment and live demo
 - [ ] Site-level access (e.g. a branch manager who only sees their own site)
+- [ ] API keys for meter data loggers
 
 ## Why "Basat"?
 
