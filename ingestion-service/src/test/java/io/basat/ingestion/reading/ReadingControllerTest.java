@@ -13,8 +13,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -72,5 +71,19 @@ class ReadingControllerTest {
                 .andExpect(jsonPath("$.title").value("Invalid request"));
 
         verify(readingPublisher, never()).publish(any());
+    }
+
+    @Test
+    void kafkaUnavailable_returns503() throws Exception {
+        doThrow(new ReadingNotPublishedException("EM-2024-001", new RuntimeException("broker unavailable")))
+                .when(readingPublisher).publish(any());
+
+        mockMvc.perform(post("/api/readings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"serialNumber":"EM-2024-001","measuredAt":"2026-11-04T10:15:00Z","energyKwh":12.75}
+                                """))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.title").value("Service unavailable"));
     }
 }

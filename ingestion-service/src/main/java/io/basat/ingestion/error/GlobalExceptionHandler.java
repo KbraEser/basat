@@ -1,5 +1,6 @@
 package io.basat.ingestion.error;
 
+import io.basat.ingestion.reading.ReadingNotPublishedException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -47,6 +48,16 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
         problem.setTitle("Internal server error");
+        return problem;
+    }
+
+    @ExceptionHandler(ReadingNotPublishedException.class)
+    public ProblemDetail handleNotPublished(ReadingNotPublishedException ex) {
+        log.error(ex.getMessage(), ex);
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE, "The reading could not be stored; try again later"
+        );
+        problem.setTitle("Service unavailable");
         return problem;
     }
 
