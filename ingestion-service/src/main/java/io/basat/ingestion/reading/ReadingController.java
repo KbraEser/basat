@@ -30,6 +30,9 @@ public class ReadingController {
             @ApiResponse(responseCode = "202", description = "Reading accepted for processing"),
             @ApiResponse(responseCode = "400", description = "Validation failed; the `errors` field lists invalid fields",
                     content = @Content(mediaType = "application/problem+json",
+                            schema = @Schema(implementation = ProblemDetail.class))),
+            @ApiResponse(responseCode = "503", description = "The reading could not be stored; send it again later",
+                    content = @Content(mediaType = "application/problem+json",
                             schema = @Schema(implementation = ProblemDetail.class)))
     })
     @PostMapping

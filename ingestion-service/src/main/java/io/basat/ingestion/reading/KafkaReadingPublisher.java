@@ -2,8 +2,11 @@ package io.basat.ingestion.reading;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
+
+import java.util.concurrent.CompletionException;
 
 @Slf4j
 @Component
@@ -19,10 +22,19 @@ public class KafkaReadingPublisher implements ReadingPublisher{
 
     @Override
     public void publish(Reading reading) {
+        try{
         // the key sends every reading of one meter to the same partition, so they stay in order
         // join(): answer 202 only after Kafka has stored the reading
         kafkaTemplate.send(topic, reading.serialNumber(), reading).join();
-        log.debug("Reading of meter {} published", reading.serialNumber());
+        log.debug("Reading of meter {} published", reading.serialNumber());}
+        catch (KafkaException e){
+        // broker unreachable: send() itself gives up after max.block.ms
+            throw new ReadingNotPublishedException(reading.serialNumber(), e);
+        } catch (CompletionException e) {
+            // broker reachable but the write failed or timed out (delivery.timeout.ms)
+            throw new ReadingNotPublishedException(reading.serialNumber(), e.getCause());
+
+        }
     }
 
 }
