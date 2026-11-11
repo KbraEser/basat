@@ -24,8 +24,9 @@ spring:
       group-id: monitoring-service
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
         spring.json.value.default.type: io.basat.monitoring.reading.ReadingMessage
         spring.json.use.type.headers: false
 
@@ -39,3 +40,4 @@ server:
 app:
   kafka:
     readings-topic: meter.readings
+    readings-dlt-topic: meter.readings.DLT

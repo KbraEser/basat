@@ -18,14 +18,9 @@ public class ReadingServiceImpl implements ReadingService{
 
     @Override
     public void store(ReadingMessage message){
-        Optional<Meter> meter = meterRepository.findBySerialNumber(message.serialNumber());
+        Meter meter = meterRepository.findBySerialNumber(message.serialNumber()).orElseThrow(()->new UnknownMeterException(message.serialNumber()));
 
-        if(meter.isEmpty()){
-            log.warn("Skipping reading for unknown serial number: {}", message.serialNumber());
-            return;
-        }
-
-        boolean stored = readingRepository.save(meter.get().getId(), message.measuredAt(),message.energyKwh());
+        boolean stored = readingRepository.save(meter.getId(), message.measuredAt(),message.energyKwh());
 
         if(!stored){
             log.info("Ignored repeated reading for meter {} at {}", message.serialNumber(), message.measuredAt());
