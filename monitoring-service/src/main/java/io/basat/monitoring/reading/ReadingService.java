@@ -5,7 +5,10 @@ public interface ReadingService {
 
     /**
      * Stores the reading for the meter with the message's serial number.
-     * Readings for unknown meters and repeated readings are skipped, not failed.
+     * A repeated reading (same meter and time) is skipped, not failed.
+     *
+     * @throws UnknownMeterException if no meter has the message's serial number
      */
     void store(ReadingMessage message);
+
 }
