@@ -25,24 +25,28 @@ Basat is a multi-tenant SaaS platform that turns meter data into actionable insi
 
 ## Architecture
 
-Target architecture (event-driven, built around Kafka):
+Event-driven, built around Kafka. The solid path already runs end to end; the rest is planned.
 
 ```
-Meter data → Ingestion Service → Kafka → Monitoring Service → TimescaleDB
-                                   ↘ Alert Service → WebSocket / Email
-React dashboard ← API Gateway ← Auth Service · Monitoring Service · AI Service
+Simulator ──REST──▶ Ingestion Service ──▶ Kafka (meter.readings) ──▶ Monitoring Service ──▶ TimescaleDB
+                                              │                         │                  (raw readings +
+                                              │                         └─▶ meter.readings.DLT  15 min / hourly /
+                                              │                             (failed messages)   daily aggregates)
+                                              └ ─ ▶ Alert Service ─ ─ ▶ WebSocket / Email      (planned)
+
+React dashboard ──▶ (Vite proxy, later API Gateway) ──▶ Auth Service · Monitoring Service · AI Service
 ```
 
 | Service | Responsibility | Status |
 |---|---|---|
 | `auth-service` | Tenants, users, roles, JWT authentication | 🟢 Done (registration, login, refresh, logout, rate limiting) |
-| `ingestion-service` | Validates meter readings and publishes them to Kafka | 🟡 In progress (REST endpoint and validation done; Kafka publishing next) |
-| `monitoring-service` | Sites, meters, time-series storage, costs, reports | 🟡 In progress (token validation, site and meter management done; time-series storage next) |
+| `ingestion-service` | Validates meter readings and publishes them to Kafka | 🟢 Done (validation, Kafka publishing keyed by meter, `503` when Kafka is down) |
+| `monitoring-service` | Sites, meters, time-series storage, costs, reports | 🟡 In progress (site and meter management, Kafka consumer, TimescaleDB storage, dead-letter topic and aggregates done; dashboard API next) |
 | `alert-service` | Anomaly rules and notifications | ⚪ Planned |
 | `ai-service` | AI assistant with tool calling over real data | ⚪ Planned |
 | `api-gateway` | Single entry point, routing, rate limiting | ⚪ Planned |
 | `simulator` | Generates realistic meter readings; later replays real building data and injects anomalies | 🟡 In progress (synthetic office, hotel and solar profiles done) |
-| `frontend` | React dashboard | ⚪ Planned |
+| `frontend` | React dashboard | 🟡 In progress (Vite, TypeScript, Tailwind and shadcn/ui set up; routing and layout next) |
 
 ## Tech stack
 
@@ -50,10 +54,10 @@ Target stack for the whole platform. Items marked ✅ are already in use.
 
 | Area | Technologies |
 |---|---|
-| **Backend** | ✅ Java 21 (virtual threads), ✅ Spring Boot 4, ✅ Spring Security, ✅ Spring Data JPA, ✅ Flyway, ✅ springdoc-openapi, ✅ JWT (RS256, Nimbus), Spring Kafka, WebSocket (STOMP), Spring Cloud Gateway, Spring AI |
-| **Data** | ✅ PostgreSQL 17 + TimescaleDB, ✅ Redis, Apache Kafka |
-| **Frontend** | React, TypeScript, Vite, TanStack Query, Redux Toolkit, Tailwind CSS, ECharts |
-| **Testing** | ✅ JUnit 5, ✅ Mockito, ✅ AssertJ, ✅ Testcontainers, Vitest, Cypress, k6 |
+| **Backend** | ✅ Java 21 (virtual threads), ✅ Spring Boot 4, ✅ Spring Security, ✅ Spring Data JPA, ✅ JdbcClient, ✅ Flyway, ✅ springdoc-openapi, ✅ JWT (RS256, Nimbus), ✅ Spring Kafka, WebSocket (STOMP), Spring Cloud Gateway, Spring AI |
+| **Data** | ✅ PostgreSQL 17 + TimescaleDB (hypertables, continuous aggregates), ✅ Redis, ✅ Apache Kafka (KRaft) |
+| **Frontend** | ✅ React 19, ✅ TypeScript, ✅ Vite, ✅ Tailwind CSS, ✅ shadcn/ui, Recharts, TanStack Query, Redux Toolkit |
+| **Testing** | ✅ JUnit 5, ✅ Mockito, ✅ AssertJ, ✅ Testcontainers (PostgreSQL, Kafka, Redis), ✅ Awaitility, Vitest, Cypress, k6 |
 | **DevOps** | ✅ Docker, ✅ Docker Compose, ✅ GitHub Actions, Prometheus, Grafana, Loki |
 
 ## API
@@ -100,9 +104,9 @@ Meters are created under their site and then addressed directly by their own ID,
 
 | Method | Endpoint | Description | Responses |
 |---|---|---|---|
-| `POST` | `/api/readings` | Accepts one meter reading (serial number, end of interval, kWh) and hands it on for processing | `202` · `400` |
+| `POST` | `/api/readings` | Accepts one meter reading (serial number, end of interval, kWh) and publishes it to Kafka | `202` · `400` · `503` |
 
-The endpoint answers `202 Accepted` because the reading is processed asynchronously. It is called by meter data loggers (the simulator for now), not by users; device authentication with API keys is planned.
+The endpoint answers `202 Accepted` only after Kafka has stored the reading, so an accepted reading is never lost; if Kafka is unreachable it answers `503` and the data logger retries. The reading is stored asynchronously by the monitoring service. The endpoint is called by meter data loggers (the simulator for now), not by users; device authentication with API keys is planned.
 
 ### Roles
 
@@ -140,7 +144,7 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 **Architecture**
 - Code is packaged by feature (`authentication`, `tenant`, `user`, `token` in auth-service; `site`, `meter` in monitoring-service; `reading` in ingestion-service; `profile`, `reading` in the simulator), not by layer.
 - Controllers depend on service interfaces (`AuthService` → `AuthServiceImpl`), which keeps layers decoupled and lets the web layer be tested with mocks.
-- The ingestion controller only knows the `ReadingPublisher` interface: readings are logged for now, and the Kafka publisher will replace the implementation without changing the controller or its tests.
+- The ingestion controller only knows the `ReadingPublisher` interface. The first implementation only logged readings; `KafkaReadingPublisher` replaced it later without any change to the controller or its tests.
 - Entities are never exposed by the API; requests and responses use dedicated DTOs (Java records).
 - Database schema changes are versioned with Flyway; Hibernate only validates the schema.
 
@@ -160,6 +164,20 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 - Meters are configured in `application.yaml` (serial number, profile, installed kW) and validated at startup; every 10 seconds one reading per meter (±5 % noise) is sent to the ingestion service with `RestClient`. A failed send is logged and the simulation keeps running, like a real data logger.
 - The profiles are an approximation. Replaying measured data from the [Building Data Genome Project 2](https://github.com/buds-lab/building-data-genome-project-2) and injecting labelled anomalies is planned for the alert and ML work.
 
+**Event streaming (Kafka)**
+- Readings are published to the `meter.readings` topic (3 partitions) with the meter's serial number as the key, so all readings of one meter land in the same partition and keep their order.
+- The producer waits for Kafka's acknowledgement (`acks=all`, idempotent producer) before the API answers; timeouts are short so a Kafka outage becomes a fast `503` instead of a hanging request.
+- Messages are plain JSON without Java type headers: the JSON shape is the contract, so producer and consumer share no classes.
+- The monitoring service consumes the topic in its own consumer group (`monitoring-service`); the planned alert service will read the same messages in a separate group.
+- Failures are handled by Spring Kafka's `DefaultErrorHandler`: a message is retried 3 times, 1 second apart, then moved to `meter.readings.DLT` with the exception in its headers. Messages that can never succeed (an unknown meter, unreadable JSON via `ErrorHandlingDeserializer`) go to the dead-letter topic straight away, so one bad message cannot block a partition. Each dead-lettered message is logged with its topic, partition and offset.
+- Kafka delivers at least once, so the consumer is idempotent: readings have the primary key `(meter_id, measured_at)` and are inserted with `ON CONFLICT DO NOTHING`; a redelivered message changes nothing.
+
+**Time series (TimescaleDB)**
+- Readings live in a TimescaleDB hypertable split into 7-day chunks, so time-range queries only scan the chunks they need.
+- They are written with plain SQL through `JdbcClient` rather than JPA: readings are many, small and never updated, and they need database-specific SQL (`ON CONFLICT`).
+- Hierarchical continuous aggregates (`readings_15m` → `readings_hourly` → `readings_daily`) keep pre-computed totals up to date in the background; charts read a few hundred rows instead of millions. Real-time aggregation adds the latest, not yet materialised minutes at query time.
+- Daily totals are bucketed by Istanbul days, not UTC days, so consumption between midnight and 03:00 is counted on the right day (and later, on the right bill).
+
 **Multi-tenancy**
 - All companies share the same tables; every row carries a `tenant_id`.
 - The tenant is always taken from the verified access token, never from the request body, so a user cannot act on behalf of another company.
@@ -177,9 +195,11 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 | Unit | `AuthServiceImplTest`, `RefreshTokenTest`, `OfficeProfileTest`, `ReadingGeneratorTest` | Business rules with Mockito, entity rules (token expiry and revocation) and simulator calculations (load curves, energy per interval); no Spring, no database |
 | Web layer | `AuthControllerTest`, `JwksControllerTest`, `SecurityConfigTest`, `ReadingControllerTest` | HTTP status codes, validation, JSON shape and token checks with `@WebMvcTest` and a mocked service |
 | HTTP client | `IngestionClientTest` | The exact request the simulator sends, and that a failing server does not stop it, with `@RestClientTest` and `MockRestServiceServer` |
+| Messaging | `KafkaReadingPublisherTest` | The reading is sent to the right topic with the serial number as key, and both a rejected send and an unreachable broker become an error the API turns into `503` (mocked `KafkaTemplate`) |
 | Integration | `RegistrationIntegrationTest`, `LoginIntegrationTest`, `RefreshAndLogoutIntegrationTest`, `LoginRateLimitIntegrationTest`, `SiteIntegrationTest`, `MeterIntegrationTest` | Full user journeys (register → login → protected endpoint → refresh → logout, rate limiting) and site/meter management (tenant isolation, roles, uniqueness rules) against real TimescaleDB and Redis started by Testcontainers |
+| Data pipeline | `ReadingListenerIntegrationTest`, `ReadingRepositoryTest`, `ReadingAggregatesTest` | Kafka → consumer → TimescaleDB with real containers: readings are stored, a duplicate message is stored once, unknown meters and invalid JSON end up in the dead-letter topic, the table is a hypertable, and aggregates sum correctly across 15-minute, hourly and Istanbul day boundaries (asynchronous checks with Awaitility) |
 
-Error cases are tested alongside the happy paths: wrong credentials, missing or reused tokens, malformed requests, too many attempts, another company's data and missing roles.
+Error cases are tested alongside the happy paths: wrong credentials, missing or reused tokens, malformed requests, too many attempts, another company's data, missing roles, an unavailable Kafka broker and messages that cannot be processed.
 
 **Logging**
 - SLF4J logs for business events (`INFO`), rejected requests (`WARN`) and unexpected errors with stack traces (`ERROR`).
@@ -197,6 +217,7 @@ Error cases are tested alongside the happy paths: wrong credentials, missing or 
 
 - Java 21
 - Docker with Docker Compose (local infrastructure and Testcontainers)
+- Node.js 22 or newer (frontend)
 
 ### Start local infrastructure
 
@@ -204,12 +225,13 @@ Error cases are tested alongside the happy paths: wrong credentials, missing or 
 docker compose up -d
 ```
 
-This starts TimescaleDB (PostgreSQL 17) and Redis (used for login rate limiting). The init script in `infra/postgres/init` creates one database per service (`auth_db`, `monitoring_db`, `alert_db`).
+This starts TimescaleDB (PostgreSQL 17), Redis (login rate limiting) and Kafka in KRaft mode (no ZooKeeper). The init script in `infra/postgres/init` creates one database per service (`auth_db`, `monitoring_db`, `alert_db`). Kafka topics are not created automatically: each service declares the topics it owns.
 
 | Service | Host port | Credentials |
 |---|---|---|
 | TimescaleDB | `5433` | `basat` / `basat` |
 | Redis | `6379` | none |
+| Kafka | `9092` | none |
 
 TimescaleDB is mapped to `5433` so it does not clash with a PostgreSQL instance already running on `5432`.
 
@@ -240,7 +262,27 @@ Start each service in its own terminal:
 | `ingestion-service` | `8083` | none |
 | `simulator` | none (no web server) | none |
 
-Each service applies its own Flyway migrations on startup. The connection can be overridden with the `DB_URL`, `DB_USERNAME` and `DB_PASSWORD` environment variables; monitoring-service finds the auth service's public key through `AUTH_JWKS_URI` (default `http://localhost:8081/.well-known/jwks.json`).
+Each service applies its own Flyway migrations on startup. The connection can be overridden with the `DB_URL`, `DB_USERNAME` and `DB_PASSWORD` environment variables, Kafka with `KAFKA_BOOTSTRAP_SERVERS` (default `localhost:9092`); monitoring-service finds the auth service's public key through `AUTH_JWKS_URI` (default `http://localhost:8081/.well-known/jwks.json`).
+
+With the simulator running, readings flow through Kafka into `monitoring_db`. To watch the topic or the dead-letter topic:
+
+```bash
+docker exec basat-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic meter.readings
+```
+
+```bash
+docker exec basat-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic meter.readings.DLT --from-beginning --formatter-property print.headers=true
+```
+
+### Run the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The app runs at http://localhost:5173. The Vite dev server proxies `/api/auth` and `/api/users` to auth-service and every other `/api` call to monitoring-service, so the browser talks to a single origin and the `SameSite=Strict` cookies work without CORS.
 
 Try it with the Swagger UI at http://localhost:8081/swagger-ui.html, or with curl:
 
@@ -258,7 +300,7 @@ cd basat
 ./mvnw verify
 ```
 
-Tests run against a real TimescaleDB instance started automatically with Testcontainers, so no local database setup is needed.
+Tests run against real TimescaleDB, Kafka and Redis instances started automatically with Testcontainers, so no local setup beyond Docker is needed.
 
 ## Roadmap
 
@@ -273,16 +315,19 @@ Tests run against a real TimescaleDB instance started automatically with Testcon
 - [x] Site and meter management with tenant isolation and role-based access
 - [x] Reading ingestion endpoint with validation
 - [x] Data simulator with realistic consumption profiles (office, hotel, solar)
-- [ ] Kafka-based ingestion and time-series storage
-- [ ] Dashboard with charts and KPIs
+- [x] Kafka-based ingestion and time-series storage (hypertable, idempotent consumer, dead-letter topic)
+- [x] 15-minute, hourly and daily continuous aggregates
+- [x] Frontend project setup (React, TypeScript, Tailwind, shadcn/ui)
+- [ ] Dashboard with charts, KPIs and three-period tariff costs
 - [ ] Real-time updates over WebSocket
 - [ ] Alerts and notifications
 - [ ] Replay of real building data (BDG2) with injected anomalies
-- [ ] Tariffs, costs and reports
+- [ ] Reports (PDF, Excel) and efficiency scores
 - [ ] AI assistant
 - [ ] Monitoring, deployment and live demo
 - [ ] Site-level access (e.g. a branch manager who only sees their own site)
 - [ ] API keys for meter data loggers
+- [ ] Replaying dead-lettered readings once their meter is registered
 
 ## Why "Basat"?
 
