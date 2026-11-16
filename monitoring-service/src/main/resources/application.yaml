@@ -44,6 +44,8 @@ app:
   # TRY per kWh excluding taxes (energy + distribution), EPDK AG single-term "Kamu ve Özel Hizmetler ile Diğer"
   # three-period tariff, effective 2026-04-04
   tariff:
+    type: TIME_OF_USE
+    single-rate: 5.934056
     day: 5.981988
     peak: 8.453271
     night: 4.015682
