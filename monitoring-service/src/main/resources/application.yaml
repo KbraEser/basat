@@ -41,3 +41,9 @@ app:
   kafka:
     readings-topic: meter.readings
     readings-dlt-topic: meter.readings.DLT
+  # TRY per kWh excluding taxes (energy + distribution), EPDK AG single-term "Kamu ve Özel Hizmetler ile Diğer"
+  # three-period tariff, effective 2026-04-04
+  tariff:
+    day: 5.981988
+    peak: 8.453271
+    night: 4.015682
