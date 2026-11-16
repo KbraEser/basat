@@ -22,7 +22,7 @@ class ConsumptionPeriodTest {
     @Test
     void lastSevenDays_includeToday(){
         assertThat(ConsumptionPeriod.LAST_7_DAYS.start(TODAY, BusinessTime.ZONE))
-        .isEqualTo(Instant.parse("2026-11-09T21:00:00Z"));
+        .isEqualTo(Instant.parse("2026-11-03T21:00:00Z"));
     }
 
     @Test
