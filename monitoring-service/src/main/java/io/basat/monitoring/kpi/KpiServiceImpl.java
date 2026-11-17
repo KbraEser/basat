@@ -39,6 +39,18 @@ public class KpiServiceImpl implements KpiService {
         if (siteId != null && siteRepository.findByIdAndTenantId(siteId, tenantId).isEmpty()) {
             throw new SiteNotFoundException(siteId);
         }
+        return summarize(tenantId, siteId, period);
+    }
+
+    @Override
+    public List<SiteKpi> getSiteKpis(UUID tenantId, ConsumptionPeriod period) {
+        return siteRepository.findAllByTenantIdOrderByName(tenantId).stream()
+                .map(site -> SiteKpi.of(site, summarize(tenantId, site.getId(), period)))
+                .toList();
+    }
+
+    // the caller has already checked that the site belongs to the company
+    private KpiResponse summarize(UUID tenantId, UUID siteId, ConsumptionPeriod period) {
         Instant now = clock.instant();
         Instant from = period.start(LocalDate.ofInstant(now, BusinessTime.ZONE), BusinessTime.ZONE);
 
