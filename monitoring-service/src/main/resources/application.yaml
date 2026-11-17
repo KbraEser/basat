@@ -49,3 +49,6 @@ app:
     day: 5.981988
     peak: 8.453271
     night: 4.015682
+  # kg CO2 per kWh at distribution-connected consumption points, ETKB 2022 production/consumption emission factors
+  carbon:
+    grid-factor: 0.474
