@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "KPIs", description = "Summary figures for the dashboard cards")
@@ -50,5 +51,23 @@ public class KpiController {
             @RequestParam(required = false) UUID siteId,
             @RequestParam(defaultValue = "TODAY") ConsumptionPeriod period) {
         return ApiResponse.of(kpiService.getKpis(TokenClaims.tenantId(jwt), siteId, period));
+    }
+
+    @Operation(summary = "Compare the sites of the company",
+            description = "One row per site, ordered by name: consumption, cost, solar production and consumption "
+                    + "per square metre. Sites without readings have zeros; sites without a floor area have no "
+                    + "consumption per square metre.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Rows calculated"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "Unknown period",
+                    content = @Content(mediaType = "application/problem+json",
+                            schema = @Schema(implementation = ProblemDetail.class)))
+    })
+    @GetMapping("/sites")
+    public ApiResponse<List<SiteKpi>> getSiteKpis(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "TODAY") ConsumptionPeriod period) {
+        return ApiResponse.of(kpiService.getSiteKpis(TokenClaims.tenantId(jwt), period));
     }
 }
