@@ -119,14 +119,51 @@ class KpiIntegrationTest {
     }
 
     @Test
+    void sites_returnsOneRowPerSiteOrderedByName() throws Exception {
+        createSite("Ofis", new BigDecimal("100"));  // 100 m², no readings
+
+        mockMvc.perform(get("/api/kpis/sites").with(company))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].siteName").value("Ofis"))
+                .andExpect(jsonPath("$.data[0].consumptionKwh").value(0))
+                .andExpect(jsonPath("$.data[0].consumptionKwhPerM2").value(0))
+                .andExpect(jsonPath("$.data[1].siteName").value("Otel"))
+                .andExpect(jsonPath("$.data[1].consumptionKwh").value(35.0))
+                .andExpect(jsonPath("$.data[1].costTry").value(180.0))
+                .andExpect(jsonPath("$.data[1].consumptionKwhPerM2").doesNotExist());
+    }
+
+    @Test
+    void sites_ofAnotherCompany_areNotListed() throws Exception {
+        mockMvc.perform(get("/api/kpis/sites").with(otherCompany))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
+    void sites_unknownPeriod_isBadRequest() throws Exception {
+        mockMvc.perform(get("/api/kpis/sites").param("period", "YESTERDAY").with(company))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void anotherCompanysSite_isNotFound() throws Exception {
         mockMvc.perform(get("/api/kpis").param("siteId", hotelId.toString()).with(otherCompany))
                 .andExpect(status().isNotFound());
     }
 
     private UUID createSite(String name) {
-        return jdbcClient.sql("INSERT INTO sites (tenant_id, name, site_type) VALUES (:tenantId, :name, 'HOTEL') RETURNING id")
-                .param("tenantId", companyId).param("name", name).query(UUID.class).single();
+        return createSite(name, null);
+    }
+
+    private UUID createSite(String name, BigDecimal floorAreaM2) {
+        return jdbcClient.sql("""
+                        INSERT INTO sites (tenant_id, name, site_type, floor_area_m2)
+                        VALUES (:tenantId, :name, 'HOTEL', :floorAreaM2) RETURNING id
+                        """)
+                .param("tenantId", companyId).param("name", name).param("floorAreaM2", floorAreaM2)
+                .query(UUID.class).single();
     }
 
     private UUID createMeter(UUID siteId, String serialNumber, String type) {
