@@ -16,6 +16,8 @@
     --color-sidebar-primary: var(--sidebar-primary);
     --color-sidebar-foreground: var(--sidebar-foreground);
     --color-sidebar: var(--sidebar);
+    --color-success: var(--success);
+    --color-warning: var(--warning);
     --color-consumption: var(--consumption);
     --color-solar: var(--solar);
     --color-tariff-day: var(--tariff-day);
@@ -78,6 +80,8 @@
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
     --radius: 0.625rem;
+    --success: oklch(0.6 0.17 150);
+    --warning: oklch(0.7 0.16 70);
     /* Basat: series and three-time tariff colours, also used by charts */
     --consumption: oklch(0.546 0.245 262.881);
     --solar: oklch(0.769 0.188 70.08);
@@ -95,42 +99,47 @@
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
+    /* deep navy instead of neutral grey, like a control room screen */
+    --background: oklch(0.16 0.025 265);
+    --foreground: oklch(0.97 0.005 265);
+    /* semi-transparent cards let the background glow shine through */
+    --card: oklch(0.21 0.025 265 / 55%);
+    --card-foreground: oklch(0.97 0.005 265);
+    --popover: oklch(0.2 0.025 265);
+    --popover-foreground: oklch(0.97 0.005 265);
+    --primary: oklch(0.97 0.005 265);
+    --primary-foreground: oklch(0.2 0.025 265);
+    --secondary: oklch(0.26 0.025 265);
+    --secondary-foreground: oklch(0.97 0.005 265);
+    --muted: oklch(0.26 0.025 265);
+    --muted-foreground: oklch(0.7 0.02 265);
+    --accent: oklch(0.28 0.03 265);
+    --accent-foreground: oklch(0.97 0.005 265);
+    --destructive: oklch(0.68 0.2 25);
+    --border: oklch(1 0 0 / 9%);
+    --input: oklch(1 0 0 / 12%);
+    --ring: oklch(0.6 0.12 265);
+    --chart-1: oklch(0.707 0.165 254.624);
+    --chart-2: oklch(0.828 0.189 84.429);
+    --chart-3: oklch(0.72 0.19 150);
+    --chart-4: oklch(0.705 0.213 47.604);
+    --chart-5: oklch(0.585 0.233 277.117);
+    /* status colours for pills, rings and sparklines */
+    --success: oklch(0.72 0.19 150);
+    --warning: oklch(0.8 0.16 80);
     --consumption: oklch(0.707 0.165 254.624);
     --solar: oklch(0.828 0.189 84.429);
     --tariff-day: oklch(0.879 0.169 91.605);
     --tariff-peak: oklch(0.705 0.213 47.604);
     --tariff-night: oklch(0.585 0.233 277.117);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --sidebar: oklch(0.14 0.025 265 / 70%);
+    --sidebar-foreground: oklch(0.97 0.005 265);
+    --sidebar-primary: oklch(0.72 0.19 150);
+    --sidebar-primary-foreground: oklch(0.16 0.025 265);
+    --sidebar-accent: oklch(1 0 0 / 6%);
+    --sidebar-accent-foreground: oklch(0.97 0.005 265);
+    --sidebar-border: oklch(1 0 0 / 8%);
+    --sidebar-ring: oklch(0.6 0.12 265);
 }
 
 @layer base {
@@ -140,6 +149,14 @@
   body {
     @apply bg-background text-foreground;
     }
+  /* soft blue and golden glows in the corners; fixed so they stay put while scrolling */
+  .dark body {
+    background:
+      radial-gradient(60rem 40rem at 0% 0%, oklch(0.4 0.12 265 / 30%), transparent 60%),
+      radial-gradient(50rem 40rem at 100% 0%, oklch(0.5 0.13 85 / 22%), transparent 60%),
+      var(--background);
+    background-attachment: fixed;
+  }
   html {
     @apply font-sans;
     }
