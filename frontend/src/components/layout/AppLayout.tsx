@@ -19,9 +19,10 @@ export function AppLayout() {
   const title = (matches.at(-1)?.handle as RouteHandle | undefined)?.title
 
   return (
-    <SidebarProvider>
+    // shadcn paints opaque backgrounds here; transparent lets the glows on <body> show through
+    <SidebarProvider className="has-data-[variant=inset]:bg-transparent">
       <AppSidebar user={demoUser} />
-      <SidebarInset>
+      <SidebarInset className="bg-transparent">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />

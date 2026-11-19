@@ -100,10 +100,10 @@
 
 .dark {
     /* deep navy instead of neutral grey, like a control room screen */
-    --background: oklch(0.16 0.025 265);
+    --background: oklch(0.14 0.025 265);
     --foreground: oklch(0.97 0.005 265);
     /* semi-transparent cards let the background glow shine through */
-    --card: oklch(0.21 0.025 265 / 55%);
+    --card: oklch(0.22 0.03 265 / 75%);
     --card-foreground: oklch(0.97 0.005 265);
     --popover: oklch(0.2 0.025 265);
     --popover-foreground: oklch(0.97 0.005 265);
@@ -152,8 +152,8 @@
   /* soft blue and golden glows in the corners; fixed so they stay put while scrolling */
   .dark body {
     background:
-      radial-gradient(60rem 40rem at 0% 0%, oklch(0.4 0.12 265 / 30%), transparent 60%),
-      radial-gradient(50rem 40rem at 100% 0%, oklch(0.5 0.13 85 / 22%), transparent 60%),
+      radial-gradient(60rem 40rem at 100% 10%, oklch(0.45 0.16 265 / 35%), transparent 60%),
+      radial-gradient(50rem 40rem at 100% 0%, oklch(0.55 0.14 85 / 32%), transparent 60%),
       var(--background);
     background-attachment: fixed;
   }
