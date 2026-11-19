@@ -2,12 +2,15 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
     --font-heading: var(--font-sans);
     --font-sans: 'Geist Variable', sans-serif;
+    /* meter-like read-outs for big numbers */
+    --font-mono: 'Geist Mono Variable', monospace;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -83,7 +86,7 @@
     --success: oklch(0.6 0.17 150);
     --warning: oklch(0.7 0.16 70);
     /* Basat: series and three-time tariff colours, also used by charts */
-    --consumption: oklch(0.546 0.245 262.881);
+    --consumption: oklch(37.53% 0.00004 271.152);
     --solar: oklch(0.769 0.188 70.08);
     --tariff-day: oklch(0.828 0.189 84.429);
     --tariff-peak: oklch(0.553 0.195 38.402);
@@ -103,7 +106,7 @@
     --background: oklch(0.14 0.025 265);
     --foreground: oklch(0.97 0.005 265);
     /* semi-transparent cards let the background glow shine through */
-    --card: oklch(0.22 0.03 265 / 75%);
+    --card: oklch(36.039% 0.00174 285.966 / 0.348);
     --card-foreground: oklch(0.97 0.005 265);
     --popover: oklch(0.2 0.025 265);
     --popover-foreground: oklch(0.97 0.005 265);
@@ -140,6 +143,27 @@
     --sidebar-accent-foreground: oklch(0.97 0.005 265);
     --sidebar-border: oklch(1 0 0 / 8%);
     --sidebar-ring: oklch(0.6 0.12 265);
+}
+
+/* frosted glass card: see-through, strongly blurred, lifted by a shadow instead of a border */
+@utility glass-card {
+  background-color: var(--card);
+  backdrop-filter: blur(40px) saturate(140%);
+  box-shadow:
+    0 16px 40px -12px rgb(0 0 0 / 0.75),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+/* moves the dash of a path from its start to its end; paths use pathLength="100" */
+@keyframes current-flow {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* live chart points fade in and out one after another */
+@keyframes twinkle {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
 }
 
 @layer base {
