@@ -30,8 +30,9 @@ Event-driven, built around Kafka. The solid path already runs end to end; the re
 ```
 Simulator ──REST──▶ Ingestion Service ──▶ Kafka (meter.readings) ──▶ Monitoring Service ──▶ TimescaleDB
                                               │                         │                  (raw readings +
-                                              │                         └─▶ meter.readings.DLT  15 min / hourly /
-                                              │                             (failed messages)   daily aggregates)
+                                              │                         ├─▶ meter.readings.DLT  15 min / hourly /
+                                              │                         │   (failed messages)   daily aggregates)
+                                              │                         └─▶ WebSocket (STOMP) ──▶ live dashboard
                                               └ ─ ▶ Alert Service ─ ─ ▶ WebSocket / Email      (planned)
 
 React dashboard ──▶ (Vite proxy, later API Gateway) ──▶ Auth Service · Monitoring Service · AI Service
@@ -41,12 +42,12 @@ React dashboard ──▶ (Vite proxy, later API Gateway) ──▶ Auth Service
 |---|---|---|
 | `auth-service` | Tenants, users, roles, JWT authentication | 🟢 Done (registration, login, refresh, logout, rate limiting) |
 | `ingestion-service` | Validates meter readings and publishes them to Kafka | 🟢 Done (validation, Kafka publishing keyed by meter, `503` when Kafka is down) |
-| `monitoring-service` | Sites, meters, time-series storage, costs, reports | 🟡 In progress (site and meter management, Kafka consumer, TimescaleDB storage, dead-letter topic and aggregates done; dashboard API next) |
+| `monitoring-service` | Sites, meters, time-series storage, costs, reports | 🟡 In progress (site and meter management, Kafka consumer, TimescaleDB storage, dashboard API with tariff costs and CO₂, site comparison and live readings over WebSocket done; reports next) |
 | `alert-service` | Anomaly rules and notifications | ⚪ Planned |
 | `ai-service` | AI assistant with tool calling over real data | ⚪ Planned |
 | `api-gateway` | Single entry point, routing, rate limiting | ⚪ Planned |
 | `simulator` | Generates realistic meter readings; later replays real building data and injects anomalies | 🟡 In progress (synthetic office, hotel and solar profiles done) |
-| `frontend` | React dashboard | 🟡 In progress (Vite, TypeScript, Tailwind and shadcn/ui set up; routing and layout next) |
+| `frontend` | React dashboard | 🟡 In progress (Vite, TypeScript, Tailwind and shadcn/ui set up; routing done; dashboard pages next) |
 
 ## Tech stack
 
@@ -54,7 +55,7 @@ Target stack for the whole platform. Items marked ✅ are already in use.
 
 | Area | Technologies |
 |---|---|
-| **Backend** | ✅ Java 21 (virtual threads), ✅ Spring Boot 4, ✅ Spring Security, ✅ Spring Data JPA, ✅ JdbcClient, ✅ Flyway, ✅ springdoc-openapi, ✅ JWT (RS256, Nimbus), ✅ Spring Kafka, WebSocket (STOMP), Spring Cloud Gateway, Spring AI |
+| **Backend** | ✅ Java 21 (virtual threads), ✅ Spring Boot 4, ✅ Spring Security, ✅ Spring Data JPA, ✅ JdbcClient, ✅ Flyway, ✅ springdoc-openapi, ✅ JWT (RS256, Nimbus), ✅ Spring Kafka, ✅ WebSocket (STOMP), Spring Cloud Gateway, Spring AI |
 | **Data** | ✅ PostgreSQL 17 + TimescaleDB (hypertables, continuous aggregates), ✅ Redis, ✅ Apache Kafka (KRaft) |
 | **Frontend** | ✅ React 19, ✅ TypeScript, ✅ Vite, ✅ Tailwind CSS, ✅ shadcn/ui, Recharts, TanStack Query, Redux Toolkit |
 | **Testing** | ✅ JUnit 5, ✅ Mockito, ✅ AssertJ, ✅ Testcontainers (PostgreSQL, Kafka, Redis), ✅ Awaitility, Vitest, Cypress, k6 |
@@ -100,6 +101,20 @@ All endpoints require the access token cookie and only return data of the signed
 
 Meters are created under their site and then addressed directly by their own ID, which keeps URLs short without losing the parent relation.
 
+**Dashboard.** `period` is `TODAY` (default), `LAST_7_DAYS` or `LAST_30_DAYS`; each period starts at local midnight (Istanbul) and runs until now. Without `siteId` the figures cover all sites of the company.
+
+| Method | Endpoint | Description | Responses |
+|---|---|---|---|
+| `GET` | `/api/consumption?siteId=&period=` | Consumption and solar production per hour (per day for 30 days), for the chart | `200` · `400` · `404` |
+| `GET` | `/api/kpis?siteId=&period=` | Total consumption, cost split by tariff band, CO₂ and solar production, for the summary cards | `200` · `400` · `404` |
+| `GET` | `/api/kpis/sites?period=` | One row per site: consumption, cost, solar production and consumption per m², for comparing sites | `200` · `400` |
+
+**Live readings (WebSocket).** The browser connects to `/ws` with STOMP and subscribes to `/topic/tenant/{tenantId}/site/{siteId}`. Every reading the monitoring service stores is pushed to that topic the moment it arrives, so the dashboard updates without polling:
+
+```json
+{ "meterId": "…", "serialNumber": "EM-2024-001", "meterType": "ELECTRICITY", "measuredAt": "2026-11-19T10:30:00Z", "energyKwh": 0.1150 }
+```
+
 ### Ingestion service
 
 | Method | Endpoint | Description | Responses |
@@ -142,9 +157,10 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 ## Engineering practices
 
 **Architecture**
-- Code is packaged by feature (`authentication`, `tenant`, `user`, `token` in auth-service; `site`, `meter` in monitoring-service; `reading` in ingestion-service; `profile`, `reading` in the simulator), not by layer.
+- Code is packaged by feature (`authentication`, `tenant`, `user`, `token` in auth-service; `site`, `meter`, `reading`, `consumption`, `tariff`, `kpi`, `live` in monitoring-service; `reading` in ingestion-service; `profile`, `reading` in the simulator), not by layer.
 - Controllers depend on service interfaces (`AuthService` → `AuthServiceImpl`), which keeps layers decoupled and lets the web layer be tested with mocks.
 - The ingestion controller only knows the `ReadingPublisher` interface. The first implementation only logged readings; `KafkaReadingPublisher` replaced it later without any change to the controller or its tests.
+- The same idea in monitoring-service: the reading service only knows `LiveReadingPublisher` (implemented with STOMP today), and cost is calculated through a `Tariff` interface (see below).
 - Entities are never exposed by the API; requests and responses use dedicated DTOs (Java records).
 - Database schema changes are versioned with Flyway; Hibernate only validates the schema.
 
@@ -178,11 +194,26 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 - Hierarchical continuous aggregates (`readings_15m` → `readings_hourly` → `readings_daily`) keep pre-computed totals up to date in the background; charts read a few hundred rows instead of millions. Real-time aggregation adds the latest, not yet materialised minutes at query time.
 - Daily totals are bucketed by Istanbul days, not UTC days, so consumption between midnight and 03:00 is counted on the right day (and later, on the right bill).
 
+**Costs and carbon**
+- Costs follow Türkiye's three-period tariff: day (06–17), peak (17–22) and night (22–06), by Istanbul local time. Each hourly total is priced at the rate of its hour, and the response shows how much of the bill each band makes up, which is where savings come from (shifting load out of peak hours).
+- A tariff is a `Tariff` interface with two implementations (Strategy pattern): `TimeOfUseTariff` (three rates) and `SingleRateTariff` (one rate, which many industrial customers use). The KPI service asks the tariff for the price of an hour and does not know which type it is; the type is chosen in configuration.
+- Prices come from EPDK's published tariff (low voltage, single-term, "public and private services and other", energy plus distribution, excluding taxes) and live in `application.yaml`, validated at startup, so a new tariff period is a configuration change, not a code change.
+- Solar production is reported separately and is not priced as consumption.
+- CO₂ is consumption × the grid emission factor for distribution-connected consumers (0.474 kg CO₂/kWh, Ministry of Energy, 2022).
+- Amounts are `BigDecimal` and are rounded only once, at the end (kWh to 3 decimals, ₺ to 2), so hourly rounding errors do not add up.
+- Site comparison includes consumption per m², so a large hotel and a small office can be compared fairly; a site without a floor area shows no value rather than a misleading zero.
+
+**Live updates (WebSocket)**
+- After a reading is stored, the monitoring service publishes it with STOMP to the topic of its site. Repeated Kafka messages are not stored again, so they are not pushed twice either.
+- The meter is loaded together with its site in one query (`@EntityGraph`), because the Kafka listener runs outside a transaction and needs the site's company to build the topic.
+- An in-memory broker is enough for a single instance; with several instances it would be replaced by an external broker (for example RabbitMQ) behind the same `LiveReadingPublisher` interface.
+
 **Multi-tenancy**
 - All companies share the same tables; every row carries a `tenant_id`.
 - The tenant is always taken from the verified access token, never from the request body, so a user cannot act on behalf of another company.
 - Every query is filtered by tenant; another company's resource is reported as not found (`404`) rather than forbidden, so its existence is not revealed.
 - Meters have no tenant column of their own: they belong to a site, and every meter query joins through the site's `tenant_id`, so a meter can never end up in a different company than its site.
+- Live topics follow the same rule. The WebSocket handshake requires the access token cookie, and a channel interceptor checks every subscription: a user may subscribe only to a single site topic of their own company (no wildcards), and clients may not send messages to topics at all.
 
 **Data integrity**
 - Business rules are checked in the service layer with clear `409` messages (duplicate site name, duplicate serial number, deleting a site that still has meters); database constraints (`UNIQUE`, foreign keys without cascade) remain as the last line of defence.
@@ -192,14 +223,16 @@ Errors are returned as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) proble
 
 | Level | Example | What it covers |
 |---|---|---|
-| Unit | `AuthServiceImplTest`, `RefreshTokenTest`, `OfficeProfileTest`, `ReadingGeneratorTest` | Business rules with Mockito, entity rules (token expiry and revocation) and simulator calculations (load curves, energy per interval); no Spring, no database |
+| Unit | `AuthServiceImplTest`, `RefreshTokenTest`, `OfficeProfileTest`, `ReadingGeneratorTest`, `TariffBandTest`, `TariffTest`, `SiteKpiTest`, `ReadingServiceImplTest`, `LiveTopicGuardTest` | Business rules with Mockito, entity rules (token expiry and revocation), simulator calculations (load curves, energy per interval), tariff band boundaries and prices, consumption per m², what is pushed live and which subscriptions are allowed; no Spring, no database |
+| Configuration | `TariffConfigTest` | The tariff type chosen in configuration creates the right `Tariff`, and a missing or negative price stops the application at startup (`ApplicationContextRunner`) |
 | Web layer | `AuthControllerTest`, `JwksControllerTest`, `SecurityConfigTest`, `ReadingControllerTest` | HTTP status codes, validation, JSON shape and token checks with `@WebMvcTest` and a mocked service |
 | HTTP client | `IngestionClientTest` | The exact request the simulator sends, and that a failing server does not stop it, with `@RestClientTest` and `MockRestServiceServer` |
 | Messaging | `KafkaReadingPublisherTest` | The reading is sent to the right topic with the serial number as key, and both a rejected send and an unreachable broker become an error the API turns into `503` (mocked `KafkaTemplate`) |
-| Integration | `RegistrationIntegrationTest`, `LoginIntegrationTest`, `RefreshAndLogoutIntegrationTest`, `LoginRateLimitIntegrationTest`, `SiteIntegrationTest`, `MeterIntegrationTest` | Full user journeys (register → login → protected endpoint → refresh → logout, rate limiting) and site/meter management (tenant isolation, roles, uniqueness rules) against real TimescaleDB and Redis started by Testcontainers |
+| Integration | `RegistrationIntegrationTest`, `LoginIntegrationTest`, `RefreshAndLogoutIntegrationTest`, `LoginRateLimitIntegrationTest`, `SiteIntegrationTest`, `MeterIntegrationTest`, `ConsumptionIntegrationTest`, `KpiIntegrationTest` | Full user journeys (register → login → protected endpoint → refresh → logout, rate limiting), site/meter management (tenant isolation, roles, uniqueness rules) and dashboard figures (hourly and daily totals, cost per tariff band, CO₂, site comparison, with a fixed clock) against real TimescaleDB and Redis started by Testcontainers |
 | Data pipeline | `ReadingListenerIntegrationTest`, `ReadingRepositoryTest`, `ReadingAggregatesTest` | Kafka → consumer → TimescaleDB with real containers: readings are stored, a duplicate message is stored once, unknown meters and invalid JSON end up in the dead-letter topic, the table is a hypertable, and aggregates sum correctly across 15-minute, hourly and Istanbul day boundaries (asynchronous checks with Awaitility) |
+| WebSocket | `LiveReadingIntegrationTest` | A real STOMP client on a running server: a reading sent to Kafka reaches the subscribed client, subscribing to another company's site is rejected with an `ERROR` frame, and a handshake without a token gets `401` |
 
-Error cases are tested alongside the happy paths: wrong credentials, missing or reused tokens, malformed requests, too many attempts, another company's data, missing roles, an unavailable Kafka broker and messages that cannot be processed.
+Error cases are tested alongside the happy paths: wrong credentials, missing or reused tokens, malformed requests, too many attempts, another company's data, missing roles, an unavailable Kafka broker, messages that cannot be processed, unknown periods and subscriptions to another company's live data.
 
 **Logging**
 - SLF4J logs for business events (`INFO`), rejected requests (`WARN`) and unexpected errors with stack traces (`ERROR`).
@@ -318,13 +351,16 @@ Tests run against real TimescaleDB, Kafka and Redis instances started automatica
 - [x] Kafka-based ingestion and time-series storage (hypertable, idempotent consumer, dead-letter topic)
 - [x] 15-minute, hourly and daily continuous aggregates
 - [x] Frontend project setup (React, TypeScript, Tailwind, shadcn/ui)
-- [ ] Dashboard with charts, KPIs and three-period tariff costs
-- [ ] Real-time updates over WebSocket
+- [x] Dashboard API: consumption chart data, KPIs, three-period tariff costs, CO₂ and site comparison
+- [x] Real-time readings over WebSocket with tenant-checked subscriptions
+- [ ] Dashboard UI with charts, KPI cards and live consumption
+- [ ] Reactive energy penalty detection (inductive/capacitive limits, cost in ₺)
 - [ ] Alerts and notifications
 - [ ] Replay of real building data (BDG2) with injected anomalies
 - [ ] Reports (PDF, Excel) and efficiency scores
 - [ ] AI assistant
 - [ ] Monitoring, deployment and live demo
+- [ ] Tariff per site and dated price history (instead of one tariff in configuration)
 - [ ] Site-level access (e.g. a branch manager who only sees their own site)
 - [ ] API keys for meter data loggers
 - [ ] Replaying dead-lettered readings once their meter is registered
