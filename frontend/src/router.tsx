@@ -7,10 +7,12 @@ import { NotFoundPage } from '@/pages/NotFoundPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { SiteDetailPage } from '@/pages/SiteDetailPage'
 import { SitesPage } from '@/pages/SitesPage'
+import { RegisterPage } from './pages/RegisterPage'
 
 export const router = createBrowserRouter([
   // Login has no menu, so it sits outside the layout.
   { path: '/login', element: <LoginPage /> },
+  {path: '/register', element: <RegisterPage />},
   {
     element: <AppLayout />,
     children: [
