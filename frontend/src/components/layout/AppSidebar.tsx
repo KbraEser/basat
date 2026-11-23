@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router'
-import { Zap } from 'lucide-react'
+import { LogOut, Zap } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -23,9 +23,11 @@ export interface SidebarUser {
 
 interface AppSidebarProps {
   user: SidebarUser
+  onLogout: () => void
+  isLoggingOut?: boolean
 }
 
-export function AppSidebar({ user }: AppSidebarProps) {
+export function AppSidebar({ user, onLogout, isLoggingOut=false }: AppSidebarProps) {
   const { pathname } = useLocation()
 
   return (
@@ -93,6 +95,13 @@ export function AppSidebar({ user }: AppSidebarProps) {
                   <span className="truncate text-xs text-muted-foreground">{user.email}</span>
                 </span>
               </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={onLogout} disabled={isLoggingOut} tooltip="Çıkış yap" className="h-9 cursor-pointer">
+              <LogOut aria-hidden="true" />
+              <span>{isLoggingOut ? 'Çıkış yapılıyor…' : 'Çıkış yap'}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
