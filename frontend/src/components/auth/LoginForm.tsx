@@ -45,7 +45,7 @@ export function LoginForm({ onSubmit, isSubmitting = false, errorMessage }: Logi
       <button
         type="submit"
         disabled={isSubmitting}
-        className="mt-2 h-11 rounded-full bg-white font-medium text-[oklch(0.2_0.03_265)] transition hover:bg-white/90 disabled:opacity-60"
+        className="mt-2 h-11 cursor-pointer rounded-full bg-white font-medium text-[oklch(0.2_0.03_265)] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isSubmitting ? 'Giriş yapılıyor…' : 'Giriş yap'}
       </button>
