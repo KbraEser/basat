@@ -13,12 +13,31 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+let refreshing: Promise<boolean> | null = null
+
+function refreshSession(): Promise<boolean> {
+  refreshing ??= fetch('/api/auth/refresh', { method: 'POST' })
+    .then((response) => response.ok)
+    .catch(() => false)
+    .finally(() => {
+      refreshing = null
+    })
+  return refreshing
+}
+
+
+async function request<T>(method: string, path: string, body?: unknown, retried = false): Promise<T> {
   const response = await fetch(path, {
     method,
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
+
+  if(response.status === 401 && !retried && !path.startsWith('/api/auth/')) {
+    if(await refreshSession()){
+        return request<T>(method, path, body, true)
+    }
+  }
 
   if (!response.ok) {
     // error bodies are problem details; a proxy error page may not be JSON at all

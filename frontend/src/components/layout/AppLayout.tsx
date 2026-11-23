@@ -30,7 +30,7 @@ export function AppLayout() {
   if (isPending) {
     return <AppLayoutSkeleton />
   }
-  if (error instanceof ApiError && error.status === 401) {
+  if (error instanceof ApiError && (error.status === 401 || error.status === 404)) {
     return <Navigate to="/login" replace />
   }
   if (!user) {
