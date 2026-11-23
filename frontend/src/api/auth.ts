@@ -7,4 +7,4 @@ export const register = (values:LoginRequest) =>api.post<LoginResponse>('/api/au
 
 export const logout = () => api.post<void>('/api/auth/logout')
 
-export const fetchCurrentUser = () => api.get<UserProfile>('/api/auth/me')
+export const fetchCurrentUser = () => api.get<UserProfile>('/api/users/me')
