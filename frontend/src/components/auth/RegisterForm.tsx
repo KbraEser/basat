@@ -4,13 +4,19 @@ import * as yup from 'yup'
 import { Building2, Lock, Mail, User } from 'lucide-react'
 import type { RegisterRequest } from '@/types/auth'
 import { AuthField } from './AuthField'
+import { isStrongPassword } from './passwordPolicy'
+import { PasswordRules } from './PasswordRules'
 
-// Same limits as RegisterRequest in auth-service (password 8–72: BCrypt's maximum).
+// Same limits as RegisterRequest in auth-service (password at most 72: BCrypt's maximum).
 const schema: yup.ObjectSchema<RegisterRequest> = yup.object({
   companyName: yup.string().trim().required('Şirket adı gerekli').max(200, 'En fazla 200 karakter'),
   fullName: yup.string().trim().required('Ad soyad gerekli').max(200, 'En fazla 200 karakter'),
   email: yup.string().trim().required('E-posta gerekli').email('Geçerli bir e-posta girin').max(255, 'En fazla 255 karakter'),
-  password: yup.string().required('Şifre gerekli').min(8, 'En az 8 karakter').max(72, 'En fazla 72 karakter'),
+  password: yup
+    .string()
+    .required('Şifre gerekli')
+    .max(72, 'En fazla 72 karakter')
+    .test('strong', 'Şifre aşağıdaki kuralların hepsine uymalı', (value) => isStrongPassword(value ?? '')),
 })
 
 interface RegisterFormProps {
@@ -24,8 +30,11 @@ export function RegisterForm({ onSubmit, isSubmitting = false, errorMessage }: R
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<RegisterRequest>({ resolver: yupResolver(schema) })
+  // re-renders on every keystroke in the password field, so the checklist below stays live
+  const password = watch('password') ?? ''
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="grid gap-5">
@@ -46,10 +55,11 @@ export function RegisterForm({ onSubmit, isSubmitting = false, errorMessage }: R
         error={errors.password?.message}
         {...register('password')}
       />
+      <PasswordRules value={password} />
       <button
         type="submit"
         disabled={isSubmitting}
-        className="mt-2 h-11 rounded-full bg-white font-medium text-[oklch(0.2_0.03_265)] transition hover:bg-white/90 disabled:opacity-60"
+        className="mt-2 h-11 cursor-pointer rounded-full bg-white font-medium text-[oklch(0.2_0.03_265)] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isSubmitting ? 'Kaydediliyor…' : 'Hesap oluştur'}
       </button>

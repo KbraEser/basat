@@ -80,6 +80,20 @@ class AuthControllerTest {
     }
 
     @Test
+    void register_returns400_whenPasswordIsWeak() throws Exception {
+        // long enough, but no upper-case letter
+        mockMvc.perform(post(REGISTER_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"companyName":"Deniz Otelcilik","fullName":"Ayşe Yılmaz","email":"ayse@deniz.com","password":"sadecekucuk1"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.password").value("must contain an upper-case letter, a lower-case letter and a digit"));
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
     void register_returns400_whenBodyIsMalformed() throws Exception {
         // when + then
         mockMvc.perform(post(REGISTER_URL)

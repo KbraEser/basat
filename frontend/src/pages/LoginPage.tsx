@@ -1,13 +1,28 @@
-import { Link } from 'react-router'
+import { useMutation } from '@tanstack/react-query'
+import { Link, useNavigate } from 'react-router'
+import { login } from '@/api/auth'
 import { AuthLayout } from '@/components/auth/AuthLayout'
 import { LoginForm } from '@/components/auth/LoginForm'
-import type { LoginRequest } from '@/types/auth'
+import { ApiError } from '@/lib/api'
+
+// Turns the backend's answer into a sentence for the user; the backend sends the same 401 for both wrong fields.
+function loginErrorMessage(error: Error | null): string | undefined {
+  if (!error) return undefined
+  if (error instanceof ApiError) {
+    if (error.status === 401) return 'E-posta veya şifre hatalı.'
+    if (error.status === 429) return 'Çok fazla deneme yapıldı. Lütfen 15 dakika sonra tekrar deneyin.'
+    if (error.status === 400) return 'Lütfen bilgileri kontrol edin.'
+  }
+  return 'Sunucuya ulaşılamadı. Lütfen biraz sonra tekrar deneyin.'
+}
 
 export function LoginPage() {
-  // TODO(Kübra): send the request to POST /api/auth/login, then go to the dashboard.
-  const handleLogin = (values: LoginRequest) => {
-    console.log('login', values.email)
-  }
+  const navigate = useNavigate()
+
+  const loginMutation = useMutation({
+    mutationFn: login,
+    onSuccess: () => navigate('/', { replace: true }),
+  })
 
   return (
     <AuthLayout
@@ -21,7 +36,11 @@ export function LoginPage() {
         </>
       }
     >
-      <LoginForm onSubmit={handleLogin} />
+      <LoginForm
+        onSubmit={(values) => loginMutation.mutate(values)}
+        isSubmitting={loginMutation.isPending}
+        errorMessage={loginErrorMessage(loginMutation.error)}
+      />
     </AuthLayout>
   )
 }
