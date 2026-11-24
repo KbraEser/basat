@@ -6,19 +6,31 @@ import { Sparkline } from '@/components/common/Sparkline'
 import { StatCard } from '@/components/common/StatCard'
 import { StatusPill } from '@/components/common/StatusPill'
 import { TariffBar } from '@/components/common/TariffBar'
+import type { ConsumptionPeriod } from '@/types/dashboard'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { PeriodSelect } from '@/components/common/PeriodSelect'
+import { setPeriod } from '@/store/dashboardSlice'
 
 // Sample figures until the page is connected to /api/kpis, /api/consumption and the live topic.
 const hourlyKwh = [32, 30, 29, 28, 30, 38, 55, 72, 88, 95, 98, 96, 90, 94, 97, 92, 85, 80, 74, 66, 58, 48, 40, 35]
 const livePower = [41.2, 41.8, 42.5, 41.9, 42.8, 43.4, 42.6, 42.1, 42.9, 43.6, 43.1, 42.3]
 
+const periodDescriptions: Record<ConsumptionPeriod, string> = {
+  TODAY: 'Bugün, tüm tesisler.',
+  LAST_7_DAYS: 'Son 7 gün, tüm tesisler.',
+  LAST_30_DAYS: 'Son 30 gün, tüm tesisler.',
+}
+
 // A mature tree stores about 22 kg CO₂ a year.
 const KG_CO2_PER_TREE_YEAR = 22
 
 export function DashboardPage() {
+  const period = useAppSelector((state) => state.dashboard.period)
+  const dispatch = useAppDispatch()
   const co2Kg = 588
   return (
     <div className="flex flex-col gap-6 p-6">
-      <PageHeader title="Genel bakış" description="Bugün, tüm tesisler." actions={<span>Son güncelleme 11:22</span>} />
+      <PageHeader title="Genel bakış" description={periodDescriptions[period]} actions={<PeriodSelect value={period} onChange={(value) => dispatch(setPeriod(value))} />} />
 
       <LivePowerCard powerKw={42.3} history={livePower} updatedAt="11:22:10" scope="Tüm tesisler" />
 
