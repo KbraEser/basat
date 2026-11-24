@@ -1,5 +1,5 @@
 import { api } from '@/lib/api'
-import type { ConsumptionPeriod, ConsumptionResponse, KpiResponse } from '@/types/dashboard'
+import type { ConsumptionPeriod, ConsumptionResponse, KpiResponse, SiteKpi } from '@/types/dashboard'
 
 // Without a site the backend sums all sites of the company.
 function query(period: ConsumptionPeriod, siteId: string | null) {
@@ -13,3 +13,6 @@ export const fetchKpis = (period: ConsumptionPeriod, siteId: string | null) =>
 
 export const fetchConsumption = (period: ConsumptionPeriod, siteId: string | null) =>
   api.get<ConsumptionResponse>(`/api/consumption?${query(period, siteId)}`)
+// One row per site, always for all sites of the company.
+export const fetchSiteKpis = (period: ConsumptionPeriod) =>
+  api.get<SiteKpi[]>(`/api/kpis/sites?${query(period, null)}`)

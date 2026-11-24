@@ -1,4 +1,4 @@
-import { fetchConsumption, fetchKpis } from "@/api/dashboard"
+import { fetchConsumption, fetchKpis, fetchSiteKpis } from "@/api/dashboard"
 import { useAppSelector } from "@/store/hooks"
 import { useQuery } from "@tanstack/react-query"
 
@@ -26,3 +26,13 @@ export function useConsumption() {
   })
 }
 
+
+/** One row per site for the comparison table; follows the period only, never a single site. */
+export function useSiteKpis() {
+  const period = useAppSelector((state) => state.dashboard.period)
+  return useQuery({
+    queryKey: ['kpis', 'sites', period],
+    queryFn: () => fetchSiteKpis(period),
+    refetchInterval: REFRESH_MS,
+  })
+}

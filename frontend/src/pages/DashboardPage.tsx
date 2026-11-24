@@ -4,12 +4,13 @@ import { LivePowerCard } from '@/components/common/LivePowerCard'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PeriodSelect } from '@/components/common/PeriodSelect'
 import { SectionLabel } from '@/components/common/SectionLabel'
+import { SiteComparisonTable } from '@/components/common/SiteComparisonTable'
 import { Sparkline } from '@/components/common/Sparkline'
 import { StatCard } from '@/components/common/StatCard'
 import { StatusPill } from '@/components/common/StatusPill'
 import { TariffBar } from '@/components/common/TariffBar'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useConsumption, useKpis } from '@/hooks/useDashboard'
+import { useConsumption, useKpis, useSiteKpis } from '@/hooks/useDashboard'
 import { formatNumber } from '@/lib/format'
 import { setPeriod } from '@/store/dashboardSlice'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
@@ -43,6 +44,7 @@ export function DashboardPage() {
   const dispatch = useAppDispatch()
   const kpis = useKpis()
   const consumption = useConsumption()
+  const siteKpis = useSiteKpis()
 
   const data = kpis.data
   const peakCost = data?.bands.find((band) => band.band === 'PEAK')?.costTry ?? 0
@@ -117,6 +119,11 @@ export function DashboardPage() {
         ) : (
           <Skeleton className="h-72 w-full" />
         )}
+      </section>
+
+      <SectionLabel>Tesis karşılaştırması</SectionLabel>
+      <section className="glass-card rounded-xl p-5">
+        {siteKpis.data ? <SiteComparisonTable rows={siteKpis.data} /> : <Skeleton className="h-40 w-full" />}
       </section>
     </div>
   )

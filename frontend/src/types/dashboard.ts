@@ -1,3 +1,5 @@
+import type { SiteType } from '@/types/site'
+
 export type ConsumptionPeriod = 'TODAY' | 'LAST_7_DAYS' | 'LAST_30_DAYS'
 
 
@@ -35,4 +37,15 @@ export interface ConsumptionResponse {
   from: string
   to: string
   points: ConsumptionPoint[]
+}
+// GET /api/kpis/sites; one row per site. Per m² is null when the site has no floor area.
+export interface SiteKpi {
+  siteId: string
+  siteName: string
+  siteType: SiteType
+  floorAreaM2: number | null
+  consumptionKwh: number
+  costTry: number
+  solarKwh: number
+  consumptionKwhPerM2: number | null
 }
