@@ -1,4 +1,5 @@
 import { Leaf, Wallet, Zap } from 'lucide-react'
+import { ConsumptionChart } from '@/components/common/ConsumptionChart'
 import { LivePowerCard } from '@/components/common/LivePowerCard'
 import { PageHeader } from '@/components/common/PageHeader'
 import { PeriodSelect } from '@/components/common/PeriodSelect'
@@ -102,6 +103,21 @@ export function DashboardPage() {
           caption={data ? `≈ ${formatNumber(data.co2Kg / KG_CO2_PER_TREE_YEAR)} ağacın bir yılda tuttuğu karbon` : undefined}
         />
       </div>
+
+      <SectionLabel>Tüketim eğrisi</SectionLabel>
+      <section className="glass-card rounded-xl p-5">
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-medium">{period === 'LAST_30_DAYS' ? 'Günlük' : 'Saatlik'} tüketim (kWh)</h3>
+          {period !== 'LAST_30_DAYS' && (
+            <p className="text-xs text-muted-foreground">Arka plan: gündüz, puant ve gece saatleri</p>
+          )}
+        </header>
+        {consumption.data ? (
+          <ConsumptionChart points={consumption.data.points} resolution={consumption.data.resolution} />
+        ) : (
+          <Skeleton className="h-72 w-full" />
+        )}
+      </section>
     </div>
   )
 }
