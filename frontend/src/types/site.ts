@@ -23,3 +23,11 @@ export interface Site {
   city: string | null
   createdAt: string
 }
+
+// POST /api/sites; SiteRequest in monitoring-service. Empty optional fields are sent as null.
+export interface SiteRequest {
+  name: string
+  type: SiteType
+  floorAreaM2: number | null
+  city: string | null
+}
