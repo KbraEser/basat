@@ -36,17 +36,21 @@ interface SiteFormProps {
   isSubmitting?: boolean
   // Message from the server, e.g. a duplicate name (409).
   errorMessage?: string
+  // Current values when editing; empty when adding a new site.
+  initialValues?: SiteRequest
 }
 
+const emptySite: SiteRequest = { name: '', type: 'OFFICE', floorAreaM2: null, city: null }
+
 /** Name, type, floor area and city of a site; checks the input before anything is sent. */
-export function SiteForm({ onSubmit, isSubmitting = false, errorMessage }: SiteFormProps) {
+export function SiteForm({ onSubmit, isSubmitting = false, errorMessage, initialValues = emptySite }: SiteFormProps) {
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<SiteRequest>({
     resolver: yupResolver(schema),
-    defaultValues: { name: '', type: 'OFFICE', floorAreaM2: null, city: null },
+    defaultValues: initialValues,
   })
 
   return (

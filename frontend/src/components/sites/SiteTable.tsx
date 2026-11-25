@@ -8,11 +8,13 @@ const dateLabel = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'lon
 
 interface SiteTableProps {
   sites: Site[]
+  // Buttons at the end of each row, e.g. edit and delete; left out for users who cannot change sites.
+  renderActions?: (site: Site) => React.ReactNode
   className?: string
 }
 
 /** Company's sites with type, city and floor area; each name opens the site's page. */
-export function SiteTable({ sites, className }: SiteTableProps) {
+export function SiteTable({ sites, renderActions, className }: SiteTableProps) {
   if (sites.length === 0) {
     return (
       <p className={cn('py-8 text-center text-sm text-muted-foreground', className)}>
@@ -30,6 +32,7 @@ export function SiteTable({ sites, className }: SiteTableProps) {
           <TableHead>Şehir</TableHead>
           <TableHead className="text-right">Alan (m²)</TableHead>
           <TableHead className="text-right">Eklenme</TableHead>
+          {renderActions && <TableHead className="w-0" aria-label="İşlemler" />}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -46,6 +49,11 @@ export function SiteTable({ sites, className }: SiteTableProps) {
               {site.floorAreaM2 === null ? <span className="text-muted-foreground">—</span> : formatNumber(site.floorAreaM2)}
             </TableCell>
             <TableCell className="text-right text-muted-foreground">{dateLabel.format(new Date(site.createdAt))}</TableCell>
+            {renderActions && (
+              <TableCell>
+                <div className="flex justify-end gap-1">{renderActions(site)}</div>
+              </TableCell>
+            )}
           </TableRow>
         ))}
       </TableBody>
