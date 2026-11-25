@@ -12,3 +12,14 @@ export const siteTypeLabels: Record<SiteType, string> = {
   SOLAR_PLANT: 'GES',
   OTHER: 'Diğer',
 }
+
+
+// GET /api/sites; SiteResponse in monitoring-service. Floor area and city are optional.
+export interface Site {
+  id: string
+  name: string
+  type: SiteType
+  floorAreaM2: number | null
+  city: string | null
+  createdAt: string
+}
