@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createSite, deleteSite, fetchSites, updateSite } from '@/api/sites'
+import { createSite, deleteSite, fetchSite, fetchSites, updateSite } from '@/api/sites'
 import type { SiteRequest } from '@/types/site'
 
 // Shared key: adding, changing or deleting a site invalidates this one list.
@@ -10,6 +10,16 @@ export function useSites() {
   return useQuery({
     queryKey: SITES_KEY,
     queryFn: fetchSites,
+  })
+}
+
+/** One site for its own page; stored under the list's key, so a change to any site refreshes it too. */
+export function useSite(siteId: string) {
+  return useQuery({
+    queryKey: [...SITES_KEY, siteId],
+    queryFn: () => fetchSite(siteId),
+    // 404 means another company's or a deleted site; asking again will not change that
+    retry: false,
   })
 }
 
