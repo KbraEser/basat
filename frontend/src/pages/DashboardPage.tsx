@@ -7,12 +7,12 @@ import { SectionLabel } from '@/components/common/SectionLabel'
 import { SiteComparisonTable } from '@/components/common/SiteComparisonTable'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useConsumption, useKpis, useSiteKpis } from '@/hooks/useDashboard'
+import { useLivePower } from '@/hooks/useLivePower'
+import { useSites } from '@/hooks/useSites'
 import { setPeriod } from '@/store/dashboardSlice'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import type { ConsumptionPeriod } from '@/types/dashboard'
 
-// Sample figures until the live card is connected to the WebSocket topic (F5).
-const livePower = [41.2, 41.8, 42.5, 41.9, 42.8, 43.4, 42.6, 42.1, 42.9, 43.6, 43.1, 42.3]
 
 const periodDescriptions: Record<ConsumptionPeriod, string> = {
   TODAY: 'Bugün, tüm tesisler.',
@@ -26,6 +26,8 @@ export function DashboardPage() {
   const kpis = useKpis()
   const consumption = useConsumption()
   const siteKpis = useSiteKpis()
+  const sites = useSites()
+  const livePower = useLivePower(sites.data?.map((site) => site.id) ?? [])
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -35,7 +37,7 @@ export function DashboardPage() {
         actions={<PeriodSelect value={period} onChange={(next) => dispatch(setPeriod(next))} />}
       />
 
-      <LivePowerCard powerKw={42.3} history={livePower} updatedAt="11:22:10" scope="Tüm tesisler" />
+      <LivePowerCard {...livePower} scope="Tüm tesisler" />
 
       {kpis.isError && (
         <p role="alert" className="rounded-lg bg-destructive/15 px-3 py-2 text-sm">

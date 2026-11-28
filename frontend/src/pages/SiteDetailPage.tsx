@@ -15,6 +15,8 @@ import { formatNumber } from '@/lib/format'
 import { setPeriod } from '@/store/dashboardSlice'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import { siteTypeLabels, type Site } from '@/types/site'
+import { useLivePower } from '@/hooks/useLivePower'
+import { LivePowerCard } from '@/components/common/LivePowerCard'
 
 // "Otel · Antalya · 12.500 m²"; parts that were not entered are left out.
 function siteSummary(site: Site) {
@@ -38,6 +40,7 @@ export function SiteDetailPage() {
   const kpis = useKpis(siteId)
   const consumption = useConsumption(siteId)
   const meters = useMeters(siteId)
+  const livePower = useLivePower([siteId])
 
   // Another company's site and a deleted one look the same: 404 for both; a mistyped id in the address is 400.
   if (site.error instanceof ApiError && (site.error.status === 404 || site.error.status === 400)) {
@@ -57,6 +60,9 @@ export function SiteDetailPage() {
         description={site.data ? siteSummary(site.data) : undefined}
         actions={<PeriodSelect value={period} onChange={(next) => dispatch(setPeriod(next))} />}
       />
+
+      <LivePowerCard {...livePower} scope="Bu tesis" />
+
 
       {(site.isError || kpis.isError) && (
         <p role="alert" className="rounded-lg bg-destructive/15 px-3 py-2 text-sm">
