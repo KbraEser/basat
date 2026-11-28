@@ -18,6 +18,7 @@ export default defineConfig({
       '/api/auth': 'http://localhost:8081',
       '/api/users': 'http://localhost:8081',
       '/api': 'http://localhost:8082',
+      '/ws': { target: 'http://localhost:8082', ws: true },
     },
   },
 })
